@@ -1,5 +1,6 @@
 # Frontend: build on GHA, stream image to VPS (no ghcr pull on server).
 # develop -> dev only | main -> prod only
+# Repo secrets: VPS_HOST, VPS_USER, VPS_PORT, VPS_SSH_KEY.
 name: Frontend Deploy
 
 on:
