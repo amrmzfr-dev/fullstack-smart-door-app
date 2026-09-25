@@ -22,8 +22,7 @@ public class UnlockController(
     public async Task<ActionResult<UnlockStatusResponse>> GetStatusAsync()
     {
         var snapshot = await doorStatusStore.GetAsync();
-        var online = snapshot is not null
-                     && DateTimeOffset.UtcNow - snapshot.LastSeenAt <= RedisDoorStatusStore.OnlineWindow;
+        var online = snapshot is not null && await doorStatusStore.IsOnlineAsync();
         return Ok(online
             ? new UnlockStatusResponse(true, snapshot!.DoorOpen, snapshot.Locked)
             : new UnlockStatusResponse(false, null, null));

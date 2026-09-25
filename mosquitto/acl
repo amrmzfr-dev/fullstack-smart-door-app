@@ -1,0 +1,11 @@
+# Who may use which topics. The door can't publish commands to itself, so a
+# leaked door password can't open the door.
+user backend
+topic readwrite smartdoor/#
+
+user door
+topic read smartdoor/door/cmd
+topic read smartdoor/door/access
+topic write smartdoor/door/status
+topic write smartdoor/door/report
+topic write smartdoor/door/online

@@ -17,7 +17,7 @@ public class DoorController(IDoorStatusStore doorStatusStore) : ControllerBase
             return Ok(new DoorStatusResponse(false, null, null, null, null, null, null, null, null));
         }
 
-        var online = DateTimeOffset.UtcNow - snapshot.LastSeenAt <= RedisDoorStatusStore.OnlineWindow;
+        var online = await doorStatusStore.IsOnlineAsync();
         return Ok(new DoorStatusResponse(
             online,
             snapshot.LastSeenAt,

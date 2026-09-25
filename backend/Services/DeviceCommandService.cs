@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using SmartDoor.Api.Contracts;
 using SmartDoor.Api.Data;
 using SmartDoor.Api.Models;
+using SmartDoor.Api.Mqtt;
 
 namespace SmartDoor.Api.Services;
 
 public class DeviceCommandService(
     AppDbContext dbContext,
+    IDoorCommandSignal commandSignal,
     ILogger<DeviceCommandService> logger) : IDeviceCommandService
 {
     private const int MaxCommandsPerHeartbeat = 5;
@@ -41,6 +43,9 @@ public class DeviceCommandService(
         };
         dbContext.DeviceCommands.Add(command);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Push it to the door now (MQTT) rather than on the next round.
+        commandSignal.Notify();
         return command;
     }
 

@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SmartDoor.Api.Controllers;
 using SmartDoor.Api.Data;
+using SmartDoor.Api.Mqtt;
 using SmartDoor.Api.Services;
 using StackExchange.Redis;
 
@@ -77,6 +78,10 @@ builder.Services.AddScoped<IDoorPinService, DoorPinService>();
 builder.Services.AddScoped<IDoorAccessService, DoorAccessService>();
 builder.Services.AddScoped<IPhoneKeyService, PhoneKeyService>();
 builder.Services.AddScoped<IPhoneInviteService, PhoneInviteService>();
+
+// Always-on door link over MQTT (off when Mqtt:Host is empty).
+builder.Services.AddSingleton<IDoorCommandSignal, DoorCommandSignal>();
+builder.Services.AddHostedService<DoorMqttHostedService>();
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")

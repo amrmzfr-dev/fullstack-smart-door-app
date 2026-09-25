@@ -10,6 +10,7 @@ on:
       - develop
     paths:
       - 'backend/**'
+      - 'mosquitto/**'
       - 'docker-compose.prod.yml'
       - 'docker-compose.dev.yml'
       - '.github/workflows/backend-deploy.yml'
@@ -73,6 +74,10 @@ jobs:
           SSH_BASE=(ssh -i "$KEY_DIR/key" -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
           scp -i "$KEY_DIR/key" -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "$COMPOSE_FILE" "${VPS_USER}@${VPS_HOST}:${APP_DIR}/${COMPOSE_FILE}"
+          # Broker config (passwd + certs stay on the VPS only).
+          "${SSH_BASE[@]}" "${VPS_USER}@${VPS_HOST}" "mkdir -p '$APP_DIR/mosquitto'"
+          scp -i "$KEY_DIR/key" -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            mosquitto/mosquitto.conf mosquitto/acl "${VPS_USER}@${VPS_HOST}:${APP_DIR}/mosquitto/"
           docker save "$SRC_IMAGE" | gzip -1 | "${SSH_BASE[@]}" "${VPS_USER}@${VPS_HOST}" 'gunzip -c | docker load'
           "${SSH_BASE[@]}" "${VPS_USER}@${VPS_HOST}" \
-            "docker tag '$SRC_IMAGE' '$DEPLOY_IMAGE' && cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' stop backend || true && docker compose -f '$COMPOSE_FILE' rm -f backend || true && docker compose -f '$COMPOSE_FILE' up -d --no-deps backend"
+            "docker tag '$SRC_IMAGE' '$DEPLOY_IMAGE' && cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' up -d --no-deps mosquitto && docker compose -f '$COMPOSE_FILE' stop backend || true && docker compose -f '$COMPOSE_FILE' rm -f backend || true && docker compose -f '$COMPOSE_FILE' up -d --no-deps backend"

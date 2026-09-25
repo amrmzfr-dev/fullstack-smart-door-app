@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
@@ -17,7 +18,7 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "1.2.1";
+constexpr char FIRMWARE_VERSION[] = "2.0.0";
 
 // Also how often app unlocks are picked up, so kept short. A door open/close
 // or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
@@ -27,7 +28,21 @@ constexpr uint32_t EVENT_RETRY_INTERVAL_MS = 3000;
 constexpr uint32_t REPORT_RETRY_INTERVAL_MS = 1000;
 constexpr uint8_t REPORT_MAX_ATTEMPTS = 5;
 constexpr uint16_t HTTP_TIMEOUT_MS = 4000;
-constexpr uint32_t NET_LOOP_DELAY_MS = 50;
+constexpr uint32_t NET_LOOP_DELAY_MS = 20;
+
+// MQTT (must match backend/Mqtt/DoorMqttTopics.cs and mosquitto/acl).
+constexpr char MQTT_USERNAME[] = "door";  // password = DEVICE_API_KEY
+constexpr char MQTT_TOPIC_CMD[] = "smartdoor/door/cmd";
+constexpr char MQTT_TOPIC_ACCESS[] = "smartdoor/door/access";
+constexpr char MQTT_TOPIC_STATUS[] = "smartdoor/door/status";
+constexpr char MQTT_TOPIC_REPORT[] = "smartdoor/door/report";
+constexpr char MQTT_TOPIC_ONLINE[] = "smartdoor/door/online";
+constexpr uint32_t MQTT_RETRY_INTERVAL_MS = 10000;
+// Status goes out on every change; this keeps "last seen" fresh when nothing
+// changes (the backend calls the door offline after 10s of silence).
+constexpr uint32_t MQTT_STATUS_INTERVAL_MS = 4000;
+constexpr uint16_t MQTT_KEEPALIVE_S = 10;
+constexpr uint16_t MQTT_BUFFER_BYTES = 1024;
 
 constexpr size_t EVENT_QUEUE_LENGTH = 32;
 constexpr size_t COMMAND_QUEUE_LENGTH = 8;
@@ -72,6 +87,11 @@ bool accessListStale = false;
 DoorEvent pendingEvents[EVENTS_PER_POST];
 size_t pendingEventCount = 0;
 uint32_t lastEventAttemptAt = 0;
+
+WiFiClientSecure mqttTls;
+PubSubClient mqtt(mqttTls);
+uint32_t lastMqttAttemptAt = 0;
+uint32_t lastMqttStatusAt = 0;
 
 CommandReport pendingReport = {};
 bool hasPendingReport = false;
@@ -229,7 +249,9 @@ bool statusChangedSinceHeartbeat() {
   return changed;
 }
 
-void sendHeartbeat() {
+// Current door state as JSON — the REST heartbeat body and the MQTT status
+// message are the same. Also remembers what was sent, to spot changes.
+String buildStatusBody() {
   DoorStatus status;
   portENTER_CRITICAL(&statusMux);
   status = latestStatus;
@@ -249,6 +271,39 @@ void sendHeartbeat() {
 
   String body;
   serializeJson(doc, body);
+  return body;
+}
+
+// The access list changed on the server when its version differs from ours.
+void checkAccessVersion(const char* serverVersion) {
+  char localVersion[ACCESS_VERSION_LENGTH + 1];
+  accessListVersion(localVersion, sizeof(localVersion));
+  if (serverVersion[0] != '\0' && strcmp(serverVersion, localVersion) != 0) {
+    accessListStale = true;
+  }
+}
+
+// One command ({ id, type, slot }) from the server, over MQTT or REST.
+void handleCommand(JsonObjectConst item) {
+  DoorCommand command = {};
+  strlcpy(command.id, item["id"] | "", sizeof(command.id));
+  command.slot = item["slot"].isNull() ? -1 : item["slot"].as<int16_t>();
+  const char* type = item["type"] | "";
+
+  if (!parseCommandKind(type, command.kind)) {
+    Serial.printf("[NET] unknown command type '%s', rejecting\n", type);
+    queueReport(command.id, CommandState::Failed, "Unknown command");
+    return;
+  }
+  Serial.printf("[NET] command received: %s\n", type);
+  if (xQueueSend(commandQueue, &command, 0) != pdTRUE) {
+    queueReport(command.id, CommandState::Failed, "Door is busy, try again");
+  }
+}
+
+// REST fallback while MQTT is down: status up, commands + access version back.
+void sendHeartbeat() {
+  const String body = buildStatusBody();
   String response;
   const int code = sendRequest("POST", "/device/heartbeat", body, &response);
   if (code != 200) {
@@ -263,29 +318,67 @@ void sendHeartbeat() {
     return;
   }
 
-  char localVersion[ACCESS_VERSION_LENGTH + 1];
-  accessListVersion(localVersion, sizeof(localVersion));
-  const char* serverVersion = reply["accessListVersion"] | "";
-  if (strcmp(serverVersion, localVersion) != 0) {
-    accessListStale = true;
+  checkAccessVersion(reply["accessListVersion"] | "");
+  for (JsonObjectConst item : reply["commands"].as<JsonArrayConst>()) {
+    handleCommand(item);
+  }
+}
+
+// ============================================================================
+// MQTT — the always-on link. The server pushes commands the moment they're
+// made; the door pushes its state the moment it changes. REST (above) is only
+// the fallback while the broker can't be reached.
+// ============================================================================
+
+void publishMqttStatus(uint32_t now) {
+  lastMqttStatusAt = now;
+  const String body = buildStatusBody();
+  if (mqtt.publish(MQTT_TOPIC_STATUS, body.c_str())) {
+    setBackendReachable(true, 0);
+  }
+}
+
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (strcmp(topic, MQTT_TOPIC_CMD) == 0) {
+    JsonDocument doc;
+    if (deserializeJson(doc, payload, length) != DeserializationError::Ok) {
+      Serial.println("[MQTT] command is not valid JSON");
+      return;
+    }
+    handleCommand(doc.as<JsonObjectConst>());
+  } else if (strcmp(topic, MQTT_TOPIC_ACCESS) == 0) {
+    char version[ACCESS_VERSION_LENGTH + 1];
+    const size_t copy = length < ACCESS_VERSION_LENGTH ? length : ACCESS_VERSION_LENGTH;
+    memcpy(version, payload, copy);
+    version[copy] = '\0';
+    checkAccessVersion(version);
+  }
+}
+
+bool ensureMqtt(uint32_t now) {
+  if (mqtt.connected()) {
+    return true;
+  }
+  if (lastMqttAttemptAt != 0 && now - lastMqttAttemptAt < MQTT_RETRY_INTERVAL_MS) {
+    return false;
+  }
+  lastMqttAttemptAt = now;
+
+  char clientId[32];
+  snprintf(clientId, sizeof(clientId), "smartdoor-door-%06llx", ESP.getEfuseMac() & 0xFFFFFFULL);
+  // Last will: the broker announces "0" the moment this connection drops,
+  // so the app shows the door offline straight away.
+  if (!mqtt.connect(clientId, MQTT_USERNAME, DEVICE_API_KEY, MQTT_TOPIC_ONLINE, 1, true, "0", true)) {
+    Serial.printf("[MQTT] connect failed (state %d) — using REST meanwhile\n", mqtt.state());
+    return false;
   }
 
-  for (JsonObject item : reply["commands"].as<JsonArray>()) {
-    DoorCommand command = {};
-    strlcpy(command.id, item["id"] | "", sizeof(command.id));
-    command.slot = item["slot"].isNull() ? -1 : item["slot"].as<int16_t>();
-    const char* type = item["type"] | "";
-
-    if (!parseCommandKind(type, command.kind)) {
-      Serial.printf("[NET] unknown command type '%s', rejecting\n", type);
-      queueReport(command.id, CommandState::Failed, "Unknown command");
-      continue;
-    }
-    Serial.printf("[NET] command received: %s\n", type);
-    if (xQueueSend(commandQueue, &command, 0) != pdTRUE) {
-      queueReport(command.id, CommandState::Failed, "Door is busy, try again");
-    }
-  }
+  mqtt.subscribe(MQTT_TOPIC_CMD, 1);
+  mqtt.subscribe(MQTT_TOPIC_ACCESS, 1);
+  publishMqttStatus(now);
+  mqtt.publish(MQTT_TOPIC_ONLINE, "1", true);
+  Serial.println("[MQTT] connected — commands are pushed from now on");
+  return true;
 }
 
 void syncAccessList() {
@@ -402,10 +495,18 @@ void flushReports(uint32_t now) {
   if (pendingReport.message[0] != '\0') {
     doc["message"] = pendingReport.message;
   }
-  String body;
-  serializeJson(doc, body);
-
-  const int code = sendRequest("POST", String("/device/commands/") + pendingReport.id, body, nullptr);
+  int code;
+  if (mqtt.connected()) {
+    // Over MQTT the id travels in the message; "published" counts as done.
+    doc["id"] = pendingReport.id;
+    String body;
+    serializeJson(doc, body);
+    code = mqtt.publish(MQTT_TOPIC_REPORT, body.c_str()) ? 204 : -1;
+  } else {
+    String body;
+    serializeJson(doc, body);
+    code = sendRequest("POST", String("/device/commands/") + pendingReport.id, body, nullptr);
+  }
   pendingReportAttempts++;
   lastReportAttemptAt = now;
 
@@ -430,9 +531,16 @@ void netTask(void*) {
   for (;;) {
     const uint32_t now = millis();
     if (ensureWifi(now)) {
+      const bool onMqtt = ensureMqtt(now);
+      if (onMqtt) {
+        mqtt.loop();  // receives pushed commands / access version
+        if (statusChangedSinceHeartbeat() || now - lastMqttStatusAt >= MQTT_STATUS_INTERVAL_MS) {
+          publishMqttStatus(now);
+        }
+      }
       flushReports(now);
       flushEvents(now);
-      if (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS || statusChangedSinceHeartbeat()) {
+      if (!onMqtt && (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS || statusChangedSinceHeartbeat())) {
         lastHeartbeatAt = now;
         sendHeartbeat();
       }
@@ -468,11 +576,20 @@ void linkBegin() {
 #endif
   }
 
+  // Broker uses a self-signed cert: encrypted, not verified (same trade-off
+  // as HTTPS without API_ROOT_CA). The door's login + the broker ACL guard it.
+  mqttTls.setInsecure();
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt.setCallback(onMqttMessage);
+  mqtt.setKeepAlive(MQTT_KEEPALIVE_S);
+  mqtt.setSocketTimeout(5);
+  mqtt.setBufferSize(MQTT_BUFFER_BYTES);
+
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   lastWifiAttemptAt = millis();
-  Serial.printf("[NET] connecting to WiFi '%s', backend %s\n", WIFI_SSID, API_BASE_URL);
+  Serial.printf("[NET] connecting to WiFi '%s', backend %s, MQTT %s:%d\n", WIFI_SSID, API_BASE_URL, MQTT_HOST, MQTT_PORT);
 
   xTaskCreatePinnedToCore(netTask, "net", NET_TASK_STACK_BYTES, nullptr, NET_TASK_PRIORITY, nullptr, NET_TASK_CORE);
 }

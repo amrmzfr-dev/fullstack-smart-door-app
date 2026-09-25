@@ -2,6 +2,7 @@
 # and streamed to the server — see .github/workflows.
 #   utils-dev.czeros.tech      -> nginx -> 127.0.0.1:3009 (frontend)
 #   utils-api-dev.czeros.tech  -> nginx -> 127.0.0.1:8099 (backend)
+#   103.20.240.48:8884         -> mosquitto (door MQTT over TLS)
 services:
   postgres:
     image: postgres:16-alpine
@@ -34,6 +35,22 @@ services:
     networks:
       - default
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smart-door-mosquitto-dev
+    restart: unless-stopped
+    # The door connects here over TLS (8883 inside). passwd + certs/ exist
+    # only on the VPS; mosquitto.conf + acl come from the repo.
+    ports:
+      - "8884:8883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+    networks:
+      - default
+
   backend:
     image: ghcr.io/amrmzfr-dev/fullstack-smart-door-app-backend:dev
     container_name: smart-door-backend-dev
@@ -43,6 +60,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
     env_file: .env.dev
     ports:
       - "127.0.0.1:8099:8080"

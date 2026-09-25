@@ -9,7 +9,16 @@ backend/    ASP.NET Core (.NET 10) + PostgreSQL + Redis
 firmware/   ESP32 door controller (PlatformIO)
 ```
 
-## How the parts talk (REST only)
+## How the parts talk
+
+- **MQTT (always-on, the fast path):** the door keeps one TLS connection to
+  the Mosquitto broker on the VPS (prod 103.20.240.48:8883, dev :8884). The
+  server pushes commands (unlock, enroll, delete) the moment they're made; the
+  door pushes its state the moment it changes, plus command results. The
+  broker's last will marks the door offline instantly if it drops. Topics:
+  `smartdoor/door/{cmd,access,status,report,online}` — see `mosquitto/acl`.
+- **REST (fallback + bulk):** if MQTT is unreachable the door falls back to the
+  heartbeat below. The access-list download and the event log always use REST.
 
 - The door calls `POST /api/device/heartbeat` every 2 s with its status and
   gets back any waiting commands (app unlock, enroll fingerprint, delete
