@@ -6,7 +6,14 @@ import {
   type CreationOptionsJson,
   type RequestOptionsJson,
 } from "@/lib/webauthn";
-import type { CommandStatus, PhoneSetupResult, UnlockProgress, UnlockStatus, WebAuthnChallenge } from "@/types";
+import type {
+  CommandStatus,
+  PhoneInviteInfo,
+  PhoneSetupResult,
+  UnlockProgress,
+  UnlockStatus,
+  WebAuthnChallenge,
+} from "@/types";
 
 // Public keypad app — none of these need a login.
 
@@ -33,12 +40,19 @@ export async function unlockWithPhone(): Promise<UnlockProgress> {
   return apiPost<UnlockProgress>("/unlock/phone", { flowId: challenge.flowId, credential });
 }
 
-// Admin only: run on the person's phone while signed in to /admin. After
-// this the phone's own fingerprint opens the door.
-export async function setUpPhone(memberId: string): Promise<PhoneSetupResult> {
-  const challenge = await apiPost<WebAuthnChallenge<CreationOptionsJson>>("/phone-keys/setup/options", { memberId });
+// ---- Phone setup through a one-time link (opened on the person's phone) ----
+
+export function fetchPhoneInvite(token: string): Promise<PhoneInviteInfo> {
+  return apiGet<PhoneInviteInfo>(`/phone-setup/${encodeURIComponent(token)}`);
+}
+
+// Asks the phone for its fingerprint once; after this the phone's own
+// fingerprint opens the door from the keypad app.
+export async function setUpPhone(token: string): Promise<PhoneSetupResult> {
+  const path = `/phone-setup/${encodeURIComponent(token)}`;
+  const challenge = await apiPost<WebAuthnChallenge<CreationOptionsJson>>(`${path}/options`);
   const credential = await createPhoneCredential(challenge.options);
-  return apiPost<PhoneSetupResult>("/phone-keys/setup", {
+  return apiPost<PhoneSetupResult>(path, {
     flowId: challenge.flowId,
     label: guessDeviceLabel(),
     credential,

@@ -125,3 +125,16 @@ export interface PhoneSetupResult {
   id: string;
   label: string;
 }
+
+// ---- Phone fingerprint setup (one-time link) ----
+
+export interface PhoneInvite {
+  token: string;
+  expiresAt: string;
+}
+
+// What the phone shows before scanning.
+export interface PhoneInviteInfo {
+  memberName: string;
+  expiresAt: string;
+}

@@ -239,8 +239,10 @@
     0 2px 4px var(--key-drop);
 }
 
+/* Disabled keys (while an unlock is processing) look exactly the same —
+   they just ignore presses, so nothing flickers grey mid-unlock. */
 .key3d:disabled {
-  opacity: 0.45;
+  cursor: default;
 }
 
 .key3d-primary {

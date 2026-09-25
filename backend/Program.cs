@@ -76,6 +76,7 @@ builder.Services.AddScoped<IAccessEventService, AccessEventService>();
 builder.Services.AddScoped<IDoorPinService, DoorPinService>();
 builder.Services.AddScoped<IDoorAccessService, DoorAccessService>();
 builder.Services.AddScoped<IPhoneKeyService, PhoneKeyService>();
+builder.Services.AddScoped<IPhoneInviteService, PhoneInviteService>();
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")

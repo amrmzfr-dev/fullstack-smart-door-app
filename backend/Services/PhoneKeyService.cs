@@ -70,6 +70,7 @@ public class PhoneKeyService(
 
     public async Task<ServiceResult<PhoneKey>> FinishSetupAsync(
         Guid flowId,
+        Guid expectedMemberId,
         string? label,
         JsonElement credential,
         CancellationToken cancellationToken)
@@ -88,6 +89,12 @@ public class PhoneKeyService(
         if (pending is null || member is null)
         {
             return ServiceResult<PhoneKey>.NotFound("Person not found.");
+        }
+
+        // The challenge must belong to the same person the setup link is for.
+        if (member.Id != expectedMemberId)
+        {
+            return ServiceResult<PhoneKey>.Invalid("This setup doesn't match the link. Start again.");
         }
 
         RegisteredPublicKeyCredential registered;

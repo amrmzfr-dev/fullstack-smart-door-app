@@ -3,7 +3,12 @@ using SmartDoor.Api.Models;
 
 namespace SmartDoor.Api.Contracts;
 
-public sealed record StartPhoneSetupRequest(Guid MemberId);
+public sealed record CreatePhoneInviteRequest(Guid MemberId);
+
+public sealed record PhoneInviteResponse(string Token, DateTimeOffset ExpiresAt);
+
+// What the phone shows before scanning. Only the name — nothing else.
+public sealed record PhoneInviteInfoResponse(string MemberName, DateTimeOffset ExpiresAt);
 
 public sealed record FinishPhoneSetupRequest(Guid FlowId, string? Label, JsonElement Credential);
 

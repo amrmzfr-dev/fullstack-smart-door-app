@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, DeviceCommand, DoorPinStatus, DoorStatus, Member } from "@/types";
+import type { AccessEvent, DeviceCommand, DoorPinStatus, DoorStatus, Member, PhoneInvite } from "@/types";
 
 // ---- Door ----
 
@@ -67,4 +67,9 @@ export function fetchCommand(id: string): Promise<DeviceCommand> {
 
 export function cancelCommand(id: string): Promise<DeviceCommand> {
   return apiPost<DeviceCommand>(`/commands/${id}/cancel`);
+}
+
+// One-time link (15 min) for setting up fingerprint unlock on a person's phone.
+export function createPhoneInvite(memberId: string): Promise<PhoneInvite> {
+  return apiPost<PhoneInvite>("/phone-setup/invites", { memberId });
 }

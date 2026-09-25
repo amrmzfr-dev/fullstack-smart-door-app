@@ -14,6 +14,7 @@ public interface IPhoneKeyService
     Task<ServiceResult<WebAuthnChallenge>> StartSetupAsync(Guid memberId, CancellationToken cancellationToken);
     Task<ServiceResult<PhoneKey>> FinishSetupAsync(
         Guid flowId,
+        Guid expectedMemberId,
         string? label,
         JsonElement credential,
         CancellationToken cancellationToken);

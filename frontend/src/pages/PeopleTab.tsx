@@ -5,6 +5,7 @@ import { AddMemberDialog } from "@/components/AddMemberDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EnrollFingerprintDialog } from "@/components/EnrollFingerprintDialog";
 import { MemberCard } from "@/components/MemberCard";
+import { PhoneInviteDialog } from "@/components/PhoneInviteDialog";
 import { SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { useMembers } from "@/hooks/useDoorData";
@@ -18,6 +19,7 @@ const NOTICE_MS = 4000;
 type Dialog =
   | { kind: "add" }
   | { kind: "enroll"; member: Member }
+  | { kind: "phone-invite"; member: Member }
   | { kind: "delete-member"; member: Member }
   | { kind: "delete-fingerprint"; member: Member; fingerprint: Fingerprint }
   | { kind: "delete-phone"; member: Member; phone: PhoneKey };
@@ -137,6 +139,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
               }
               onAddFingerprint={() => setDialog({ kind: "enroll", member })}
               onDeleteFingerprint={(fingerprint) => setDialog({ kind: "delete-fingerprint", member, fingerprint })}
+              onSetUpPhone={() => setDialog({ kind: "phone-invite", member })}
               onDeletePhone={(phone) => setDialog({ kind: "delete-phone", member, phone })}
               onDelete={() => setDialog({ kind: "delete-member", member })}
             />
@@ -173,6 +176,16 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
           busy={deleting}
           onCancel={closeDialog}
           onConfirmed={() => void confirmDelete()}
+        />
+      )}
+
+      {dialog?.kind === "phone-invite" && (
+        <PhoneInviteDialog
+          member={dialog.member}
+          onClose={() => {
+            setDialog(null);
+            void reload();
+          }}
         />
       )}
 

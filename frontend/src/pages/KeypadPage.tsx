@@ -335,7 +335,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
             onPointerCancel={() => setFingerDown(false)}
             onContextMenu={(event) => event.preventDefault()}
             onClick={() => void openWithPhone()}
-            className="relative flex size-[var(--finger)] items-center justify-center rounded-full select-none [grid-area:finger] disabled:opacity-45"
+            className="relative flex size-[var(--finger)] items-center justify-center rounded-full select-none [grid-area:finger]"
           >
             {(fingerDown || scanning) && (
               <>

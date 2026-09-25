@@ -12,6 +12,7 @@ interface MemberCardProps {
   onToggleEnabled: (enabled: boolean) => void;
   onAddFingerprint: () => void;
   onDeleteFingerprint: (fingerprint: Fingerprint) => void;
+  onSetUpPhone: () => void;
   onDeletePhone: (phone: PhoneKey) => void;
   onDelete: () => void;
 }
@@ -22,6 +23,7 @@ export function MemberCard({
   onToggleEnabled,
   onAddFingerprint,
   onDeleteFingerprint,
+  onSetUpPhone,
   onDeletePhone,
   onDelete,
 }: MemberCardProps) {
@@ -91,7 +93,7 @@ export function MemberCard({
         )}
       </div>
 
-      {/* Phones (their own fingerprint / face unlock, set up on the keypad app) */}
+      {/* Phones (their own fingerprint / face unlock, set up from a one-time link) */}
       <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
         <div className="flex items-center gap-3">
           <Smartphone className="size-4 flex-none text-muted-foreground" />
@@ -103,6 +105,10 @@ export function MemberCard({
                 : `${member.phones.length} set up for fingerprint unlock`}
             </p>
           </div>
+          <Button variant="outline" size="sm" disabled={busy} onClick={onSetUpPhone}>
+            <Plus />
+            Set up
+          </Button>
         </div>
         {member.phones.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pl-7">

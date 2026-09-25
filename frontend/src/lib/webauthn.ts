@@ -131,3 +131,13 @@ export function guessDeviceLabel(): string {
   if (/Windows/i.test(agent)) return "Windows PC";
   return "Phone";
 }
+
+// True when this device has a built-in fingerprint / face reader set up.
+export async function hasPhoneFingerprint(): Promise<boolean> {
+  if (!isPhoneUnlockSupported()) return false;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}

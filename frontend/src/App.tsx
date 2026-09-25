@@ -4,12 +4,21 @@ import type { Theme } from "@/lib/theme";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { KeypadPage } from "@/pages/KeypadPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { PhoneSetupPage } from "@/pages/PhoneSetupPage";
 
-// "/" is the public keypad (no login). "/admin" is the management dashboard.
-const IS_ADMIN = window.location.pathname.startsWith("/admin");
+// "/"              public keypad (no login)
+// "/admin"         management dashboard
+// "/setup/<token>" one-time phone fingerprint setup, opened on the person's phone
+const PATH = window.location.pathname;
+const IS_ADMIN = PATH.startsWith("/admin");
+const SETUP_TOKEN = PATH.startsWith("/setup/") ? decodeURIComponent(PATH.slice("/setup/".length)) : null;
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
+
+  if (SETUP_TOKEN) {
+    return <PhoneSetupPage token={SETUP_TOKEN} theme={theme} onToggleTheme={toggleTheme} />;
+  }
 
   return IS_ADMIN ? (
     <AdminApp theme={theme} onToggleTheme={toggleTheme} />
