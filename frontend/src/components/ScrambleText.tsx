@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { cn } from "@/lib/utils";
-
 const GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*@";
 const TICK_MS = 70;
 // Ticks between each letter locking into place once the answer is known.
