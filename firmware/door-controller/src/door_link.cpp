@@ -17,7 +17,7 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "1.0.0";
+constexpr char FIRMWARE_VERSION[] = "1.1.0";
 
 constexpr uint32_t HEARTBEAT_INTERVAL_MS = 2000;   // also how often commands are picked up
 constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
