@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
 const GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*@";
-const TICK_MS = 70;
+const TICK_MS = 45;
 // Ticks between each letter locking into place once the answer is known.
-const TICKS_PER_LETTER = 2;
+const TICKS_PER_LETTER = 1;
 
 export type ScrambleTone = "idle" | "success" | "error";
 

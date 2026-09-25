@@ -22,8 +22,8 @@ const PIN_MAX_LENGTH = 4;
 const RESULT_MS = 5000;
 const NOTICE_MS = 5000;
 const LOCKOUT_MS = 60_000;
-// Fast enough that the lock picture follows the real door within a second.
-const STATUS_POLL_MS = 1000;
+// Fast enough that the lock picture follows the real door almost at once.
+const STATUS_POLL_MS = 500;
 
 // Test PINs for trying the screen without a door. Dev builds only, and they
 // never reach the server, so they can't open anything.

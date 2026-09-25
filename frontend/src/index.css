@@ -260,8 +260,8 @@
    Built from real boxes (not a flat drawing): the gate leans back in
    perspective, and every part has a solid side edge for thickness plus inset
    shine/shade so the bars read as round metal. Solid colours only.
-   Open plays in order: dial turns straight, then it splits in two and
-   both halves slide apart with the bars. */
+   Open happens all at once (no waiting): dial turns straight, splits in two
+   and both halves slide apart with the bars. */
 .vault-stage {
   perspective: 900px;
 }
@@ -289,7 +289,7 @@
   box-shadow:
     inset 0 6px 14px var(--screen-inset),
     inset 0 -1px 0 var(--vault-shine);
-  transition: background-color 0.4s 0.5s;
+  transition: background-color 0.3s;
 }
 
 .vault[data-state="open"] .vault-plate {
@@ -326,17 +326,15 @@
 /* One side = its two bars + its half of the dial, moved as a single piece
    so the square stays fixed to the rods. */
 .vault-side {
-  transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
 .vault[data-state="open"] .vault-side-left {
   transform: translateX(-26%);
-  transition-delay: 0.35s;
 }
 
 .vault[data-state="open"] .vault-side-right {
   transform: translateX(26%);
-  transition-delay: 0.35s;
 }
 
 .vault-rivet {
