@@ -229,7 +229,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
               ? "Door offline"
               : door?.doorOpen
                 ? "Door open"
-                : door?.locked === false
+                : opened || door?.locked === false // confirmed unlock shows at once
                   ? "Unlocked"
                   : "Locked"}
         </span>
