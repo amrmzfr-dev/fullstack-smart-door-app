@@ -1,4 +1,4 @@
-import { FingerprintPattern, KeyRound, Plus, Smartphone, Trash2, X } from "lucide-react";
+import { FingerprintPattern, Plus, Smartphone, Trash2, X } from "lucide-react";
 
 import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,6 @@ interface MemberCardProps {
   member: Member;
   busy: boolean;
   onToggleEnabled: (enabled: boolean) => void;
-  onSetPin: () => void;
-  onClearPin: () => void;
   onAddFingerprint: () => void;
   onDeleteFingerprint: (fingerprint: Fingerprint) => void;
   onDeletePhone: (phone: PhoneKey) => void;
@@ -22,8 +20,6 @@ export function MemberCard({
   member,
   busy,
   onToggleEnabled,
-  onSetPin,
-  onClearPin,
   onAddFingerprint,
   onDeleteFingerprint,
   onDeletePhone,
@@ -45,7 +41,7 @@ export function MemberCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-extrabold tracking-tight">{member.name}</p>
           <p className="text-xs text-muted-foreground">
-            {member.enabled ? "Can open the door" : "Disabled — can't open the door"}
+            {member.enabled ? "Fingerprint opens the door" : "Disabled — fingerprint won't open the door"}
           </p>
         </div>
         <Switch
@@ -54,23 +50,6 @@ export function MemberCard({
           onChange={onToggleEnabled}
           label={member.enabled ? `Disable ${member.name}` : `Enable ${member.name}`}
         />
-      </div>
-
-      {/* PIN */}
-      <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
-        <KeyRound className="size-4 flex-none text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">PIN</p>
-          <p className="font-mono text-xs text-muted-foreground">{member.hasPin ? "• • • •" : "Not set"}</p>
-        </div>
-        {member.hasPin && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClearPin}>
-            Remove
-          </Button>
-        )}
-        <Button variant="outline" size="sm" disabled={busy} onClick={onSetPin}>
-          {member.hasPin ? "Change" : "Set PIN"}
-        </Button>
       </div>
 
       {/* Fingerprints */}
@@ -120,7 +99,7 @@ export function MemberCard({
             <p className="text-sm font-bold">Phones</p>
             <p className="text-xs text-muted-foreground">
               {member.phones.length === 0
-                ? "None — they can set one up on the keypad app with their PIN"
+                ? "None set up"
                 : `${member.phones.length} set up for fingerprint unlock`}
             </p>
           </div>

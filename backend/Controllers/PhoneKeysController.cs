@@ -1,31 +1,25 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
 using SmartDoor.Api.Contracts;
 using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Controllers;
 
-// Phones registered for fingerprint unlock. Setting one up happens on the
-// public keypad app (the person's PIN proves who they are); removing one is
-// an admin job.
+// Phones registered for fingerprint unlock. Admin only: the admin signs in on
+// the person's phone and sets it up for them.
 [ApiController]
 [Route("api/phone-keys")]
 public class PhoneKeysController(IPhoneKeyService phoneKeyService) : ControllerBase
 {
     [HttpPost("setup/options")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimits.PinAttempts)]
     public async Task<ActionResult<WebAuthnChallengeResponse>> StartSetupAsync(
         [FromBody] StartPhoneSetupRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await phoneKeyService.StartSetupAsync(request.Pin, cancellationToken);
+        var result = await phoneKeyService.StartSetupAsync(request.MemberId, cancellationToken);
         return this.ToActionResult(result, challenge => Ok(UnlockController.ToResponse(challenge)));
     }
 
     [HttpPost("setup")]
-    [AllowAnonymous]
     public async Task<ActionResult<PhoneSetupResponse>> FinishSetupAsync(
         [FromBody] FinishPhoneSetupRequest request,
         CancellationToken cancellationToken)

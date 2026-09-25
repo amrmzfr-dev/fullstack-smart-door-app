@@ -66,10 +66,15 @@ export interface Member {
   id: string;
   name: string;
   enabled: boolean;
-  hasPin: boolean;
   fingerprints: Fingerprint[];
   phones: PhoneKey[];
   createdAt: string;
+}
+
+// The one door PIN everyone uses. Never the PIN itself.
+export interface DoorPinStatus {
+  isSet: boolean;
+  updatedAt: string | null;
 }
 
 export interface DeviceCommand {

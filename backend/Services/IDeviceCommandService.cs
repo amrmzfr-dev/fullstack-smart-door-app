@@ -5,9 +5,9 @@ namespace SmartDoor.Api.Services;
 
 public interface IDeviceCommandService
 {
-    // Queues an unlock for a member who has already proved who they are (app
-    // PIN or phone fingerprint). The caller checks the door is online first.
-    Task<DeviceCommand> QueueUnlockAsync(Member member, AccessMethod method, CancellationToken cancellationToken);
+    // Queues an unlock once the caller has checked the proof (door PIN -> no
+    // member, phone fingerprint -> that member) and that the door is online.
+    Task<DeviceCommand> QueueUnlockAsync(Member? member, AccessMethod method, CancellationToken cancellationToken);
     Task<ServiceResult<DeviceCommand>> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<DeviceCommand>> CancelAsync(Guid id, CancellationToken cancellationToken);
 

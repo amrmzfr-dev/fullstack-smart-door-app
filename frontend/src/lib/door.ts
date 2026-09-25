@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, DeviceCommand, DoorStatus, Member } from "@/types";
+import type { AccessEvent, DeviceCommand, DoorPinStatus, DoorStatus, Member } from "@/types";
 
 // ---- Door ----
 
@@ -9,6 +9,20 @@ export function fetchDoorStatus(): Promise<DoorStatus> {
 
 export function fetchEvents(limit = 200): Promise<AccessEvent[]> {
   return apiGet<AccessEvent[]>(`/events?limit=${limit}`);
+}
+
+// ---- Door PIN (one for everyone) ----
+
+export function fetchDoorPin(): Promise<DoorPinStatus> {
+  return apiGet<DoorPinStatus>("/door-pin");
+}
+
+export function setDoorPin(pin: string): Promise<DoorPinStatus> {
+  return apiPut<DoorPinStatus>("/door-pin", { pin });
+}
+
+export function clearDoorPin(): Promise<DoorPinStatus> {
+  return apiDelete<DoorPinStatus>("/door-pin");
 }
 
 // ---- People ----
@@ -23,14 +37,6 @@ export function createMember(name: string): Promise<Member> {
 
 export function updateMember(id: string, name: string, enabled: boolean): Promise<Member> {
   return apiPut<Member>(`/members/${id}`, { name, enabled });
-}
-
-export function setMemberPin(id: string, pin: string): Promise<Member> {
-  return apiPut<Member>(`/members/${id}/pin`, { pin });
-}
-
-export function clearMemberPin(id: string): Promise<Member> {
-  return apiDelete<Member>(`/members/${id}/pin`);
 }
 
 export function deleteMember(id: string): Promise<void> {

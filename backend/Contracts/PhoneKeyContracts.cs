@@ -3,7 +3,7 @@ using SmartDoor.Api.Models;
 
 namespace SmartDoor.Api.Contracts;
 
-public sealed record StartPhoneSetupRequest(string Pin);
+public sealed record StartPhoneSetupRequest(Guid MemberId);
 
 public sealed record FinishPhoneSetupRequest(Guid FlowId, string? Label, JsonElement Credential);
 

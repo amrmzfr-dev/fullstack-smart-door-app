@@ -24,12 +24,12 @@ public class PhoneKeyService(
 
     private sealed record PendingSetup(Guid MemberId, string OptionsJson);
 
-    public async Task<ServiceResult<WebAuthnChallenge>> StartSetupAsync(string pin, CancellationToken cancellationToken)
+    public async Task<ServiceResult<WebAuthnChallenge>> StartSetupAsync(Guid memberId, CancellationToken cancellationToken)
     {
-        var member = await doorAccessService.FindMemberByPinAsync(pin, cancellationToken);
+        var member = await dbContext.Members.AsNoTracking().FirstOrDefaultAsync(m => m.Id == memberId, cancellationToken);
         if (member is null)
         {
-            return ServiceResult<WebAuthnChallenge>.Invalid("Wrong PIN.");
+            return ServiceResult<WebAuthnChallenge>.NotFound("Person not found.");
         }
 
         var existing = await dbContext.PhoneKeys

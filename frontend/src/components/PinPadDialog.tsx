@@ -4,8 +4,8 @@ import { LoaderCircle } from "lucide-react";
 import { Keypad, PinDisplay, type KeypadKey } from "@/components/Keypad";
 import { Modal } from "@/components/Modal";
 import { errorMessage } from "@/lib/api";
-import { setMemberPin } from "@/lib/door";
-import type { Member } from "@/types";
+import { setDoorPin } from "@/lib/door";
+import type { DoorPinStatus } from "@/types";
 
 // Must match PinRules on the backend and PIN_MIN/MAX_LENGTH in the firmware.
 const PIN_MIN_LENGTH = 4;
@@ -14,14 +14,16 @@ const PIN_MAX_LENGTH = 4;
 type Phase = "enter" | "confirm";
 
 interface PinPadDialogProps {
-  member: Member;
+  // Whether a door PIN already exists (changes the title only).
+  replacing: boolean;
   onClose: () => void;
-  onSaved: (member: Member) => void;
+  onSaved: (status: DoorPinStatus) => void;
 }
 
 const DIGITS = new Set(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
-export function PinPadDialog({ member, onClose, onSaved }: PinPadDialogProps) {
+// Sets the one door PIN everyone uses (typed twice to avoid typos).
+export function PinPadDialog({ replacing, onClose, onSaved }: PinPadDialogProps) {
   const [phase, setPhase] = useState<Phase>("enter");
   const [firstEntry, setFirstEntry] = useState("");
   const [value, setValue] = useState("");
@@ -41,14 +43,14 @@ export function PinPadDialog({ member, onClose, onSaved }: PinPadDialogProps) {
     async (pin: string) => {
       setSaving(true);
       try {
-        onSaved(await setMemberPin(member.id, pin));
+        onSaved(await setDoorPin(pin));
       } catch (err) {
         fail(errorMessage(err, "Couldn't save the PIN. Try again."));
       } finally {
         setSaving(false);
       }
     },
-    [member.id, onSaved, fail],
+    [onSaved, fail],
   );
 
   const handleKey = useCallback(
@@ -109,8 +111,8 @@ export function PinPadDialog({ member, onClose, onSaved }: PinPadDialogProps) {
 
   return (
     <Modal
-      title={member.hasPin ? `Change PIN for ${member.name}` : `Set PIN for ${member.name}`}
-      subtitle="Same keypad as on the door"
+      title={replacing ? "Change the door PIN" : "Set the door PIN"}
+      subtitle="One PIN for everyone — on the door and in the app"
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -139,7 +141,7 @@ export function PinPadDialog({ member, onClose, onSaved }: PinPadDialogProps) {
         <Keypad onKey={handleKey} disabled={saving} />
 
         <p className="text-center text-xs text-muted-foreground">
-          The door picks up the new PIN within a few seconds.
+          The door picks up the new PIN within a few seconds. The old one stops working.
         </p>
       </div>
     </Modal>

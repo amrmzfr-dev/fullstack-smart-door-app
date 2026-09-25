@@ -29,10 +29,10 @@ export async function unlockWithPhone(): Promise<UnlockProgress> {
   return apiPost<UnlockProgress>("/unlock/phone", { flowId: challenge.flowId, credential });
 }
 
-// The PIN proves who's holding the phone; after this the phone's own
-// fingerprint is enough.
-export async function setUpPhone(pin: string): Promise<PhoneSetupResult> {
-  const challenge = await apiPost<WebAuthnChallenge<CreationOptionsJson>>("/phone-keys/setup/options", { pin });
+// Admin only: run on the person's phone while signed in to /admin. After
+// this the phone's own fingerprint opens the door.
+export async function setUpPhone(memberId: string): Promise<PhoneSetupResult> {
+  const challenge = await apiPost<WebAuthnChallenge<CreationOptionsJson>>("/phone-keys/setup/options", { memberId });
   const credential = await createPhoneCredential(challenge.options);
   return apiPost<PhoneSetupResult>("/phone-keys/setup", {
     flowId: challenge.flowId,

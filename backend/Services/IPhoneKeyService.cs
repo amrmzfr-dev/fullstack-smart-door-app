@@ -7,11 +7,11 @@ namespace SmartDoor.Api.Services;
 // is the WebAuthn JSON for navigator.credentials.create / get.
 public sealed record WebAuthnChallenge(Guid FlowId, string OptionsJson);
 
-// Phone fingerprint / face unlock (WebAuthn passkeys). Setting one up needs
-// the person's PIN once; after that the phone's own fingerprint is enough.
+// Phone fingerprint / face unlock (WebAuthn passkeys). An admin sets a phone up
+// for a person (on that phone); after that the phone's own fingerprint is enough.
 public interface IPhoneKeyService
 {
-    Task<ServiceResult<WebAuthnChallenge>> StartSetupAsync(string pin, CancellationToken cancellationToken);
+    Task<ServiceResult<WebAuthnChallenge>> StartSetupAsync(Guid memberId, CancellationToken cancellationToken);
     Task<ServiceResult<PhoneKey>> FinishSetupAsync(
         Guid flowId,
         string? label,

@@ -5,12 +5,11 @@ import { AddMemberDialog } from "@/components/AddMemberDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EnrollFingerprintDialog } from "@/components/EnrollFingerprintDialog";
 import { MemberCard } from "@/components/MemberCard";
-import { PinPadDialog } from "@/components/PinPadDialog";
 import { SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { useMembers } from "@/hooks/useDoorData";
 import { errorMessage } from "@/lib/api";
-import { clearMemberPin, deleteFingerprint, deleteMember, deletePhoneKey, updateMember } from "@/lib/door";
+import { deleteFingerprint, deleteMember, deletePhoneKey, updateMember } from "@/lib/door";
 import { cn } from "@/lib/utils";
 import type { Fingerprint, Member, PhoneKey } from "@/types";
 
@@ -18,7 +17,6 @@ const NOTICE_MS = 4000;
 
 type Dialog =
   | { kind: "add" }
-  | { kind: "pin"; member: Member }
   | { kind: "enroll"; member: Member }
   | { kind: "delete-member"; member: Member }
   | { kind: "delete-fingerprint"; member: Member; fingerprint: Fingerprint }
@@ -86,12 +84,12 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
     }
   };
 
-  const pinCount = members.filter((member) => member.hasPin).length;
   const fingerprintCount = members.reduce((total, member) => total + member.fingerprints.length, 0);
 
+  // People are only for fingerprints — the PIN is one for everyone (Door tab).
   return (
     <div className="space-y-4">
-      <SectionHeading label="People" title="Who can open the door">
+      <SectionHeading label="People" title="Fingerprints">
         <Button onClick={() => setDialog({ kind: "add" })}>
           <Plus />
           Add person
@@ -99,7 +97,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
       </SectionHeading>
 
       <p className="text-xs text-muted-foreground">
-        {members.length} {members.length === 1 ? "person" : "people"} · {pinCount} with a PIN · {fingerprintCount}{" "}
+        {members.length} {members.length === 1 ? "person" : "people"} · {fingerprintCount}{" "}
         {fingerprintCount === 1 ? "fingerprint" : "fingerprints"}
         {!doorOnline && " · Door offline: changes reach it when it reconnects, fingerprints need it online"}
       </p>
@@ -120,7 +118,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
         <div className="flex flex-col items-center gap-3 rounded-[18px] border border-dashed border-border p-10 text-center">
           <Users className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {loading ? "Loading people…" : "No one added yet. Add a person, then give them a PIN or a fingerprint."}
+            {loading ? "Loading people…" : "No one added yet. Add a person, then register their fingerprint."}
           </p>
         </div>
       ) : (
@@ -137,10 +135,6 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
                   `${member.name} ${enabled ? "enabled" : "disabled"}`,
                 )
               }
-              onSetPin={() => setDialog({ kind: "pin", member })}
-              onClearPin={() =>
-                void runForMember(member, () => clearMemberPin(member.id), `PIN removed for ${member.name}`)
-              }
               onAddFingerprint={() => setDialog({ kind: "enroll", member })}
               onDeleteFingerprint={(fingerprint) => setDialog({ kind: "delete-fingerprint", member, fingerprint })}
               onDeletePhone={(phone) => setDialog({ kind: "delete-phone", member, phone })}
@@ -154,19 +148,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
         <AddMemberDialog
           onClose={closeDialog}
           onCreated={(member) => {
-            setNotice({ tone: "success", text: `${member.name} added — now set a PIN or add a fingerprint` });
-            setDialog(null);
-            void reload();
-          }}
-        />
-      )}
-
-      {dialog?.kind === "pin" && (
-        <PinPadDialog
-          member={dialog.member}
-          onClose={closeDialog}
-          onSaved={(member) => {
-            setNotice({ tone: "success", text: `PIN saved for ${member.name}` });
+            setNotice({ tone: "success", text: `${member.name} added — now register their fingerprint` });
             setDialog(null);
             void reload();
           }}

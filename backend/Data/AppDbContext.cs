@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AccessEvent> AccessEvents => Set<AccessEvent>();
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
     public DbSet<PhoneKey> PhoneKeys => Set<PhoneKey>();
+    public DbSet<DoorSettings> DoorSettings => Set<DoorSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,8 +28,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(m => m.Id);
             entity.Property(m => m.Name).IsRequired().HasMaxLength(64);
             entity.Property(m => m.Enabled).HasDefaultValue(true);
-            entity.Property(m => m.PinSalt).HasMaxLength(32);
-            entity.Property(m => m.PinHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<Fingerprint>(entity =>
@@ -40,6 +39,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany(m => m.Fingerprints)
                 .HasForeignKey(f => f.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DoorSettings>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Id).ValueGeneratedNever();
+            entity.Property(s => s.PinSalt).HasMaxLength(32);
+            entity.Property(s => s.PinHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<PhoneKey>(entity =>

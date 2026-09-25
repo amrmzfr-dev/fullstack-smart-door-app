@@ -27,7 +27,7 @@ public class DeviceCommandService(
     private static readonly TimeSpan DeleteResendAfter = TimeSpan.FromSeconds(60);
 
     public async Task<DeviceCommand> QueueUnlockAsync(
-        Member member,
+        Member? member,
         AccessMethod method,
         CancellationToken cancellationToken)
     {
@@ -35,9 +35,9 @@ public class DeviceCommandService(
         {
             Id = Guid.NewGuid(),
             Type = CommandType.Unlock,
-            MemberId = member.Id,
+            MemberId = member?.Id,
             Method = method,
-            CreatedBy = member.Name,
+            CreatedBy = member?.Name ?? "keypad app",
         };
         dbContext.DeviceCommands.Add(command);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -185,7 +185,7 @@ public class DeviceCommandService(
                     Type = AccessEventType.Granted,
                     Method = command.Method ?? AccessMethod.Remote,
                     MemberId = unlockedBy?.Id,
-                    MemberName = unlockedBy?.Name ?? command.CreatedBy,
+                    MemberName = unlockedBy?.Name,
                     OccurredAt = now,
                 });
                 break;

@@ -1,5 +1,6 @@
 import { Cpu, DoorClosed, DoorOpen, FingerprintPattern, Lock, LockOpen, Siren } from "lucide-react";
 
+import { DoorPinCard } from "@/components/DoorPinCard";
 import { EventRow } from "@/components/EventRow";
 import { SectionHeading } from "@/components/SectionLabel";
 import { StatusCard, type StatusTone } from "@/components/StatusCard";
@@ -99,6 +100,11 @@ export function DoorTab({ status, events, eventsLoading, onViewLog }: DoorTabPro
             detail={status?.templateCount != null ? `${status.templateCount} stored on sensor` : "AS608 sensor"}
           />
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeading label="Access" title="PIN for everyone" />
+        <DoorPinCard />
       </section>
 
       {/* No unlock button here on purpose: the door only opens with a PIN or

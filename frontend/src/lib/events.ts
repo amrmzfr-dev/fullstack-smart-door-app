@@ -50,8 +50,9 @@ export function describeEvent(event: AccessEvent): EventDescription {
 function describeGranted(event: AccessEvent): Pick<EventDescription, "title" | "detail"> {
   switch (event.method) {
     case "keypad":
-      // No member = the built-in default PIN, used before the first sync.
-      return { title: event.memberName ?? "Default PIN", detail: "Opened with PIN" };
+      // The door PIN belongs to nobody (and before the first sync it's the
+      // built-in default PIN).
+      return { title: "Door PIN", detail: "Opened with PIN on the door" };
     case "fingerprint":
       return {
         title: event.memberName ?? `Fingerprint #${event.fingerprintSlot ?? "?"}`,
@@ -62,7 +63,7 @@ function describeGranted(event: AccessEvent): Pick<EventDescription, "title" | "
     case "remote":
       return { title: event.memberName ?? event.username ?? "Web app", detail: "Remote unlock from the web app" };
     case "app_pin":
-      return { title: event.memberName ?? "Someone", detail: "Opened with PIN on the app" };
+      return { title: "Door PIN", detail: "Opened with PIN on the app" };
     case "phone_fingerprint":
       return { title: event.memberName ?? "Someone", detail: "Opened with phone fingerprint" };
     case "none":
@@ -75,9 +76,7 @@ function describeDenied(event: AccessEvent): Pick<EventDescription, "title" | "d
     return { title: "Wrong PIN", detail: "Keypad" };
   }
   if (event.method === "app_pin") {
-    return event.memberName
-      ? { title: event.memberName, detail: "App PIN blocked — person is disabled" }
-      : { title: "Wrong PIN", detail: "App keypad" };
+    return { title: "Wrong PIN", detail: "App keypad" };
   }
   if (event.method === "fingerprint") {
     if (event.memberName) {

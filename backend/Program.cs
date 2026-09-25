@@ -73,6 +73,7 @@ builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IFingerprintService, FingerprintService>();
 builder.Services.AddScoped<IAccessEventService, AccessEventService>();
+builder.Services.AddScoped<IDoorPinService, DoorPinService>();
 builder.Services.AddScoped<IDoorAccessService, DoorAccessService>();
 builder.Services.AddScoped<IPhoneKeyService, PhoneKeyService>();
 

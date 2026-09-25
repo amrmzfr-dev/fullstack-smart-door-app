@@ -20,7 +20,7 @@ public class MembersController(IMemberService memberService) : ControllerBase
         [FromBody] CreateMemberRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await memberService.CreateAsync(request.Name, request.Pin, cancellationToken);
+        var result = await memberService.CreateAsync(request.Name, cancellationToken);
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
 
@@ -31,23 +31,6 @@ public class MembersController(IMemberService memberService) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await memberService.UpdateAsync(id, request.Name, request.Enabled, cancellationToken);
-        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
-    }
-
-    [HttpPut("{id:guid}/pin")]
-    public async Task<ActionResult<MemberResponse>> SetPinAsync(
-        Guid id,
-        [FromBody] SetPinRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await memberService.SetPinAsync(id, request.Pin, cancellationToken);
-        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
-    }
-
-    [HttpDelete("{id:guid}/pin")]
-    public async Task<ActionResult<MemberResponse>> ClearPinAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await memberService.ClearPinAsync(id, cancellationToken);
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
 

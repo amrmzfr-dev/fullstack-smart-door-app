@@ -32,7 +32,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
   };
 
   return (
-    <Modal title="Add a person" subtitle="Then give them a PIN, a fingerprint, or both" onClose={onClose}>
+    <Modal title="Add a person" subtitle="Then register their fingerprint on the door" onClose={onClose}>
       <form onSubmit={(event) => void submit(event)} className="space-y-4">
         <label className="flex flex-col gap-1.5">
           <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
