@@ -93,14 +93,14 @@ export function Keypad3D({ screen, tone, disabled = false, onKey }: Keypad3DProp
   };
 
   return (
-    <div className="pad-stage w-full max-w-[340px] py-2" onPointerMove={onStageMove} onPointerLeave={onStageLeave}>
-      <div ref={padRef} className="pad-3d flex flex-col gap-5">
-        <div data-tone={tone} className="pad-screen rounded-[18px] px-4 py-4">
+    <div className="pad-stage w-full max-w-[340px] py-1" onPointerMove={onStageMove} onPointerLeave={onStageLeave}>
+      <div ref={padRef} className="pad-3d flex flex-col gap-[var(--gap)]">
+        <div data-tone={tone} className="pad-screen rounded-[18px] px-4 py-[clamp(6px,1.4dvh,16px)]">
           {screen}
         </div>
 
         {/* pb leaves room for the bottom row's raised edge. */}
-        <div className="grid grid-cols-3 gap-3 pb-2 [transform-style:preserve-3d]">
+        <div className="grid grid-cols-3 gap-[clamp(6px,1.3dvh,12px)] pb-2 [transform-style:preserve-3d]">
           {KEYS.map((key) => {
             const isEnter = key === "enter";
             const isBack = key === "back";
@@ -129,18 +129,18 @@ export function Keypad3D({ screen, tone, disabled = false, onKey }: Keypad3DProp
                 onPointerCancel={() => press(key, false)}
                 onContextMenu={(event) => event.preventDefault()}
                 className={cn(
-                  "key3d flex h-[60px] touch-none flex-col items-center justify-center rounded-[16px] select-none sm:h-16",
+                  "key3d flex h-[var(--key-h)] touch-none flex-col items-center justify-center rounded-[16px] select-none",
                   isEnter ? "key3d-primary text-primary-foreground" : "text-card-foreground",
                 )}
               >
                 {isEnter ? (
-                  <ArrowRight className="size-6" strokeWidth={2.5} />
+                  <ArrowRight className="size-[40%]" strokeWidth={2.5} />
                 ) : isBack ? (
-                  <Delete className="size-5 text-muted-foreground" />
+                  <Delete className="size-[36%] text-muted-foreground" />
                 ) : (
                   <>
-                    <span className="text-[26px] leading-none font-extrabold">{key}</span>
-                    <span className="mt-0.5 h-3 font-mono text-[9px] tracking-[.18em] text-muted-foreground">
+                    <span className="text-[calc(var(--key-h)*0.42)] leading-none font-extrabold">{key}</span>
+                    <span className="mt-0.5 font-mono text-[calc(var(--key-h)*0.15)] leading-none tracking-[.18em] text-muted-foreground">
                       {LETTERS[key] ?? ""}
                     </span>
                   </>

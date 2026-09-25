@@ -43,7 +43,7 @@ export function ScrambleText({ target, tone, length = 6 }: ScrambleTextProps) {
           key={index}
           data-tone={settled ? tone : "idle"}
           data-locked={settled}
-          className="scramble-tile flex h-16 max-w-12 flex-1 items-center justify-center rounded-[12px] font-mono text-4xl font-extrabold"
+          className="scramble-tile flex h-[var(--tile-h)] max-w-12 flex-1 items-center justify-center rounded-[12px] font-mono text-[calc(var(--tile-h)*0.56)] font-extrabold"
         >
           {/* New key per character so every change replays the flip. */}
           <span key={`${index}-${char}`} className="scramble-glyph">

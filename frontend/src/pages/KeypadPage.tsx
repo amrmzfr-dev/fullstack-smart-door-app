@@ -222,7 +222,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
           : "Type your PIN, then press →"));
 
   const screen = (
-    <div className="space-y-3">
+    <div className="space-y-[clamp(4px,1dvh,12px)]">
       <div className="flex items-center justify-between font-mono text-[10px] font-medium tracking-[.16em] uppercase">
         <span className="text-muted-foreground">Enter PIN</span>
         <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -244,7 +244,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
         </span>
       </div>
 
-      <div className="flex h-20 items-center justify-center">
+      <div className="flex h-[calc(var(--tile-h)+12px)] items-center justify-center">
         {/* One component through checking → result, so the flicker flows
             straight into the answer. */}
         {busy || opening || isOpen || doorFailed || denied ? (
@@ -278,7 +278,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
 
       <p
         className={cn(
-          "min-h-8 text-center text-xs leading-4",
+          "min-h-8 text-center text-xs leading-4 short-landscape:min-h-4",
           errorShown || locked
             ? "text-destructive"
             : notice?.tone === "success"
@@ -294,24 +294,30 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="flex items-center justify-between px-3 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+    // Exactly one screen tall and never scrolls — sizes come from the screen
+    // (see .keypad-page / .keypad-layout in index.css).
+    <div className="keypad-page flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      <header className="flex flex-none items-center justify-between px-3 pt-[max(clamp(6px,1.5dvh,16px),env(safe-area-inset-top))] sm:px-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-[11px] bg-primary text-primary-foreground">
-            <DoorClosed className="size-4.5" strokeWidth={2.25} />
+          <div className="flex size-8 items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
+            <DoorClosed className="size-4" strokeWidth={2.25} />
           </div>
-          <span className="text-lg font-extrabold tracking-tight uppercase">Smart Door</span>
+          <span className="text-base font-extrabold tracking-tight uppercase">Smart Door</span>
         </div>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <VaultLock
-          state={isOpen ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
-          digits={pin.length}
-          shakeKey={shakeKey}
-        />
-        <Keypad3D screen={screen} tone={tone} disabled={busy || opening || locked} onKey={handleKey} />
+      <main className="keypad-layout min-h-0 flex-1 px-4 pb-[max(clamp(6px,1.5dvh,16px),env(safe-area-inset-bottom))]">
+        <div className="flex w-full justify-center [grid-area:vault]">
+          <VaultLock
+            state={isOpen ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
+            digits={pin.length}
+            shakeKey={shakeKey}
+          />
+        </div>
+        <div className="flex w-full justify-center self-center [grid-area:pad]">
+          <Keypad3D screen={screen} tone={tone} disabled={busy || opening || locked} onKey={handleKey} />
+        </div>
 
         {phoneSupported && (
           // Just a pad to put your finger on. Pulses while pressed and while
@@ -329,7 +335,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
             onPointerCancel={() => setFingerDown(false)}
             onContextMenu={(event) => event.preventDefault()}
             onClick={() => void openWithPhone()}
-            className="relative mt-6 flex size-20 items-center justify-center rounded-full select-none disabled:opacity-45"
+            className="relative flex size-[var(--finger)] items-center justify-center rounded-full select-none [grid-area:finger] disabled:opacity-45"
           >
             {(fingerDown || scanning) && (
               <>
@@ -341,13 +347,13 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
               data-down={fingerDown}
               className="key3d key3d-primary relative flex size-full items-center justify-center rounded-full text-primary-foreground"
             >
-              <FingerprintPattern className="size-9" strokeWidth={1.75} />
+              <FingerprintPattern className="size-[45%]" strokeWidth={1.75} />
             </span>
           </button>
         )}
 
         {/* People, PINs and fingerprints are all set up in the admin dashboard. */}
-        <p className="mt-10 text-center text-xs text-muted-foreground">Not registered? Contact the admin.</p>
+        <p className="text-center text-[11px] text-muted-foreground [grid-area:note]">Not registered? Contact the admin.</p>
       </main>
     </div>
   );

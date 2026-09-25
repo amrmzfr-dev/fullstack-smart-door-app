@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant short-landscape (@media (orientation: landscape) and (max-height: 560px));
 
 @theme inline {
   --font-sans: "Archivo", system-ui, sans-serif;
@@ -472,5 +473,43 @@
   .scramble-tile,
   .scramble-glyph {
     animation: none;
+  }
+}
+
+/* ---- Keypad page: always exactly one screen, never scrolls ----
+   Every size comes from the screen height (dvh) within sensible limits, so
+   the whole page fits any phone, tablet or desktop. A short landscape screen
+   (phone on its side) splits into two columns: lock + fingerprint | keypad. */
+.keypad-page {
+  --vault-h: clamp(52px, 13dvh, 144px);
+  --key-h: clamp(36px, 7.4dvh, 64px);
+  --tile-h: clamp(28px, 6.2dvh, 64px);
+  --finger: clamp(42px, 8.5dvh, 80px);
+  --gap: clamp(6px, 1.8dvh, 20px);
+}
+
+.keypad-layout {
+  display: grid;
+  grid-template-areas: "vault" "pad" "finger" "note";
+  grid-template-columns: minmax(0, 340px);
+  align-content: center;
+  justify-content: center;
+  justify-items: center;
+  row-gap: var(--gap);
+  column-gap: 2.5rem;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .keypad-page {
+    --vault-h: clamp(52px, 26dvh, 140px);
+    --key-h: clamp(28px, 11dvh, 56px);
+    --tile-h: clamp(24px, 8dvh, 52px);
+    --finger: clamp(38px, 15dvh, 72px);
+    --gap: clamp(4px, 2dvh, 14px);
+  }
+
+  .keypad-layout {
+    grid-template-areas: "vault pad" "finger pad" "note pad";
+    grid-template-columns: minmax(0, 300px) minmax(0, 340px);
   }
 }

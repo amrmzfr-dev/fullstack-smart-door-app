@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 
 export type VaultState = "idle" | "working" | "open" | "error";
 
-const BAR_ROWS = ["top-[20%]", "bottom-[20%]"];
+// Rods sit inside the square's height (the square is 62% of the lock height).
+const BAR_ROWS = ["top-[23%]", "bottom-[23%]"];
 const SPOKE_ANGLES = [0, 90, 180, 270];
 const DEGREES_PER_DIGIT = 45;
 
@@ -24,10 +25,10 @@ export function VaultLock({ state, digits, shakeKey }: VaultLockProps) {
     // The shake lives on the wrapper so it doesn't cancel the lock's tilt.
     <div
       key={state === "error" ? `error-${shakeKey}` : "vault"}
-      className={cn("vault-stage mb-4 w-full max-w-[340px]", state === "error" && "animate-pin-shake")}
+      className={cn("vault-stage w-full max-w-[340px]", state === "error" && "animate-pin-shake")}
       aria-hidden
     >
-      <div data-state={state} className="vault relative h-32 w-full sm:h-36">
+      <div data-state={state} className="vault relative h-[var(--vault-h)] w-full">
         {/* Recessed back plate — lights up green through the gap when open. */}
         <div className="vault-plate absolute inset-y-[8%] right-7 left-7 rounded-[10px]" />
 
@@ -41,10 +42,10 @@ export function VaultLock({ state, digits, shakeKey }: VaultLockProps) {
                 <div
                   key={row}
                   className={cn(
-                    // Rods run from under the post to the side of the square (half the
-                    // square is 40px, 48px on bigger screens), tucking 8px under its
+                    // Rods run from under the post (12px in) to the side of the square
+                    // (half of it is 31% of the lock height), tucking 8px under its
                     // edge so the flat end sits flush against it.
-                    "vault-bar absolute h-8 w-[calc(50%-44px)] sm:h-9 sm:w-[calc(50%-52px)]",
+                    "vault-bar absolute h-[calc(var(--vault-h)*0.2)] w-[calc(50%-4px-var(--vault-h)*0.31)]",
                     row,
                     // Round at the post end, flat where it meets the square.
                     side === "left" ? "left-3 rounded-l-full" : "right-3 rounded-r-full",
@@ -56,7 +57,7 @@ export function VaultLock({ state, digits, shakeKey }: VaultLockProps) {
                   half, so closed it looks like one square. */}
               <div
                 className={cn(
-                  "absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 sm:size-24",
+                  "absolute top-1/2 left-1/2 size-[calc(var(--vault-h)*0.62)] -translate-x-1/2 -translate-y-1/2",
                   `vault-knob-${side}`,
                 )}
               >
@@ -69,14 +70,14 @@ export function VaultLock({ state, digits, shakeKey }: VaultLockProps) {
                     {SPOKE_ANGLES.map((angle) => (
                       <span
                         key={angle}
-                        className="absolute top-1/2 left-1/2 h-[42%] w-2.5 origin-top -translate-x-1/2"
+                        className="absolute top-1/2 left-1/2 h-[42%] w-[9%] origin-top -translate-x-1/2"
                         style={{ transform: `rotate(${angle}deg)` }}
                       >
                         <span className="vault-spoke absolute inset-0 rounded-[3px]" />
-                        <span className="vault-spoke absolute -bottom-1.5 left-1/2 size-4 -translate-x-1/2 rounded-[4px]" />
+                        <span className="vault-spoke absolute -bottom-[5%] left-1/2 aspect-square w-[190%] -translate-x-1/2 rounded-[4px]" />
                       </span>
                     ))}
-                    <span className="vault-spoke absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-[5px]" />
+                    <span className="vault-spoke absolute top-1/2 left-1/2 size-[22%] -translate-x-1/2 -translate-y-1/2 rounded-[5px]" />
                   </div>
                 </div>
               </div>
