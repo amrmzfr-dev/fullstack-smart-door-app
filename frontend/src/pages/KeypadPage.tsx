@@ -73,13 +73,18 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
 
   const online = door === null ? null : door.online;
   // The real door, as last reported: open (contact) or unlocked (relay).
-  const doorIsOpen = door?.doorOpen === true || door?.locked === false;
+  const doorReportsOpen = door?.online === true && (door.doorOpen === true || door.locked === false);
 
   const opening = command !== null && !isFinished(command.status);
-  // "OPEN" result from an unlock, or the door is open/unlocked right now.
-  const opened = command?.status === "succeeded";
-  const showOpen = opened || (doorIsOpen && command === null);
-  const doorFailed = command !== null && isFinished(command.status) && !opened;
+  const unlockConfirmed = command?.status === "succeeded";
+
+  // THE single open/closed value. The OPEN tiles, the "Unlocked" label and
+  // the vault all read only this, so they always change together — whether
+  // the door confirmed an app unlock, or reports it's unlocked/open (door
+  // keypad, fingerprint, exit button). Closing happens together too, once
+  // neither says open any more.
+  const isOpen = unlockConfirmed || doorReportsOpen;
+  const doorFailed = command !== null && isFinished(command.status) && !unlockConfirmed;
   const locked = lockedUntil !== null && now < lockedUntil;
   const lockSeconds = lockedUntil !== null && locked ? Math.ceil((lockedUntil - now) / 1000) : 0;
 
@@ -201,7 +206,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   };
 
   const errorShown = doorFailed || notice?.tone === "error";
-  const tone: PadTone = opened ? "success" : errorShown ? "error" : "idle";
+  const tone: PadTone = isOpen ? "success" : errorShown ? "error" : "idle";
 
   const hint = locked
     ? `Too many tries — wait ${lockSeconds}s`
@@ -229,7 +234,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
               ? "Door offline"
               : door?.doorOpen
                 ? "Door open"
-                : opened || door?.locked === false // confirmed unlock shows at once
+                : isOpen
                   ? "Unlocked"
                   : "Locked"}
         </span>
@@ -238,10 +243,10 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
       <div className="flex h-20 items-center justify-center">
         {/* One component through checking → result, so the flicker flows
             straight into the answer. */}
-        {busy || opening || opened || doorFailed || denied ? (
+        {busy || opening || isOpen || doorFailed || denied ? (
           <ScrambleText
-            target={opened ? "OPEN" : doorFailed ? "FAILED" : denied ? "DENIED" : null}
-            tone={opened ? "success" : doorFailed || denied ? "error" : "idle"}
+            target={isOpen ? "OPEN" : doorFailed ? "FAILED" : denied ? "DENIED" : null}
+            tone={isOpen ? "success" : doorFailed || denied ? "error" : "idle"}
           />
         ) : (
           <div key={shakeKey} className={cn("flex gap-2.5", shakeKey > 0 && "animate-pin-shake")}>
@@ -274,12 +279,12 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
             ? "text-destructive"
             : notice?.tone === "success"
               ? "text-success"
-              : opened
+              : isOpen
                 ? "text-success"
                 : "text-muted-foreground",
         )}
       >
-        {opened ? "Push the door within 5 seconds" : hint}
+        {isOpen ? "Push the door within 5 seconds" : hint}
       </p>
     </div>
   );
@@ -298,7 +303,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
 
       <main className="flex flex-1 flex-col items-center justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <VaultLock
-          state={showOpen ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
+          state={isOpen ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
           digits={pin.length}
           shakeKey={shakeKey}
         />
