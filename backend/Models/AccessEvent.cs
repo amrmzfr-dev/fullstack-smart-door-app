@@ -32,6 +32,10 @@ public class AccessEvent
     public Guid? MemberId { get; set; }
     public string? MemberName { get; set; }
 
+    // Which door, with its name copied for the same reason.
+    public Guid? DoorId { get; set; }
+    public string? DoorName { get; set; }
+
     // Web-app user behind a remote unlock (older log rows only).
     public string? Username { get; set; }
     public int? FingerprintSlot { get; set; }

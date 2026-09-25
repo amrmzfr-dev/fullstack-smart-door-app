@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DoorClosed, FingerprintPattern } from "lucide-react";
+import { ChevronDown, FingerprintPattern, Menu } from "lucide-react";
 
+import { DoorDrawer } from "@/components/DoorDrawer";
 import { Keypad3D, type PadKey, type PadTone } from "@/components/Keypad3D";
 import { ScrambleText } from "@/components/ScrambleText";
 import { VaultLock } from "@/components/VaultLock";
@@ -10,10 +11,10 @@ import { useNow } from "@/hooks/useNow";
 import { usePolling } from "@/hooks/usePolling";
 import { HttpError } from "@/lib/api";
 import type { Theme } from "@/lib/theme";
-import { fetchUnlock, fetchUnlockStatus, unlockWithPhone, unlockWithPin } from "@/lib/unlock";
+import { fetchPublicDoors, fetchUnlock, unlockWithPhone, unlockWithPin } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
 import { isCancelled, isPhoneUnlockSupported } from "@/lib/webauthn";
-import type { UnlockStatus } from "@/types";
+import type { PublicDoor } from "@/types";
 
 // Must match PinRules on the backend.
 const PIN_MIN_LENGTH = 4;
@@ -39,6 +40,26 @@ interface Notice {
   text: string;
 }
 
+// The door picked in the sidebar, remembered on this phone. Only a
+// convenience — which door opens is always shown at the top.
+const PICKED_DOOR_KEY = "smart-door-picked-door";
+
+function readPickedDoor(): string | null {
+  try {
+    return localStorage.getItem(PICKED_DOOR_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function savePickedDoor(id: string): void {
+  try {
+    localStorage.setItem(PICKED_DOOR_KEY, id);
+  } catch {
+    // Private mode — it just won't be remembered.
+  }
+}
+
 interface KeypadPageProps {
   theme: Theme;
   onToggleTheme: () => void;
@@ -57,11 +78,18 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   // Last attempt was refused (wrong PIN / fingerprint) — shows DENIED.
   const [denied, setDenied] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const [door, setDoor] = useState<UnlockStatus | null>(null);
+  // All doors with their live state; the picked one lives in the sidebar.
+  const [doors, setDoors] = useState<PublicDoor[] | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(readPickedDoor);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   // pollMs 0: fetchUnlock waits on the server, so ask again straight away.
   const { command, track, reset } = useCommandTracker(fetchUnlock, { pollMs: 0 });
   const now = useNow(1000);
   const phoneSupported = isPhoneUnlockSupported();
+
+  // The picked door, or the first one if nothing (valid) was picked yet.
+  const door = doors?.find((candidate) => candidate.id === pickedId) ?? doors?.[0] ?? null;
+  const doorId = door?.id ?? null;
 
   // After an app unlock, the screen shows open straight away (the door just
   // took the unlock). As soon as the door itself reports unlocked/open, it
@@ -69,17 +97,23 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   // relocks the moment the door does — not on a timer.
   const [handedOffId, setHandedOffId] = useState<string | null>(null);
   const confirmedIdRef = useRef<string | null>(null);
+  const doorIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    doorIdRef.current = doorId;
+  }, [doorId]);
 
   const refreshStatus = useCallback(async () => {
     try {
-      const status = await fetchUnlockStatus();
-      setDoor(status);
+      const list = await fetchPublicDoors();
+      setDoors(list);
+      const current = list.find((candidate) => candidate.id === doorIdRef.current);
       const confirmedId = confirmedIdRef.current;
-      if (confirmedId !== null && status.online && (status.doorOpen === true || status.locked === false)) {
+      if (confirmedId !== null && current?.online && (current.doorOpen === true || current.locked === false)) {
         setHandedOffId(confirmedId);
       }
     } catch {
-      setDoor({ online: false, doorOpen: null, locked: null });
+      // Server unreachable: keep the names, show every door offline.
+      setDoors((current) => current?.map((item) => ({ ...item, online: false, doorOpen: null, locked: null })) ?? null);
     }
   }, []);
   usePolling(refreshStatus, STATUS_POLL_MS);
@@ -167,7 +201,11 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
           }
           return;
         }
-        track(await unlockWithPin(value));
+        if (doorId === null) {
+          showError("No door to open yet.");
+          return;
+        }
+        track(await unlockWithPin(doorId, value));
       } catch (err) {
         handleError(err);
       } finally {
@@ -175,7 +213,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
         setPin("");
       }
     },
-    [track, showError, handleError],
+    [doorId, track, showError, handleError],
   );
 
   const handleKey = useCallback(
@@ -216,13 +254,29 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
         }
         return;
       }
-      track(await unlockWithPhone());
+      if (doorId === null) {
+        showError("No door to open yet.");
+        return;
+      }
+      track(await unlockWithPhone(doorId));
     } catch (err) {
       handleError(err);
     } finally {
       setBusy(false);
       setScanning(false);
     }
+  };
+
+  // Switch door from the sidebar: forget anything typed or shown for the
+  // previous door, and remember the choice on this phone.
+  const pickDoor = (id: string) => {
+    savePickedDoor(id);
+    setPickedId(id);
+    reset();
+    setPin("");
+    setNotice(null);
+    setDenied(false);
+    setDrawerOpen(false);
   };
 
   const errorShown = doorFailed || notice?.tone === "error";
@@ -313,15 +367,32 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
     // Exactly one screen tall and never scrolls — sizes come from the screen
     // (see .keypad-page / .keypad-layout in index.css).
     <div className="keypad-page flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <header className="flex flex-none items-center justify-between px-3 pt-[max(clamp(6px,1.5dvh,16px),env(safe-area-inset-top))] sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
-            <DoorClosed className="size-4" strokeWidth={2.25} />
-          </div>
-          <span className="text-base font-extrabold tracking-tight uppercase">Smart Door</span>
-        </div>
+      <header className="flex flex-none items-center justify-between gap-2 px-3 pt-[max(clamp(6px,1.5dvh,16px),env(safe-area-inset-top))] sm:px-6">
+        {/* The door you're about to open — tap to change it (sidebar). */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Choose door"
+          className="flex min-w-0 items-center gap-2.5 rounded-[12px] py-1 pr-2 text-left hover:bg-secondary/60"
+        >
+          <span className="flex size-8 flex-none items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
+            <Menu className="size-4" strokeWidth={2.25} />
+          </span>
+          <span className="min-w-0 truncate text-base font-extrabold tracking-tight uppercase">
+            {door?.name ?? "Smart Door"}
+          </span>
+          <ChevronDown className="size-4 flex-none text-muted-foreground" />
+        </button>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </header>
+
+      <DoorDrawer
+        open={drawerOpen}
+        doors={doors ?? []}
+        pickedId={doorId}
+        onPick={pickDoor}
+        onClose={() => setDrawerOpen(false)}
+      />
 
       <main className="keypad-layout min-h-0 flex-1 px-4 pb-[max(clamp(6px,1.5dvh,16px),env(safe-area-inset-bottom))]">
         <div className="flex w-full justify-center [grid-area:vault]">

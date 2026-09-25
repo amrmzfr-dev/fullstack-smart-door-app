@@ -6,6 +6,7 @@ public interface IFingerprintService
 {
     Task<ServiceResult<DeviceCommand>> StartEnrollmentAsync(
         Guid memberId,
+        Guid doorId,
         string? label,
         string createdBy,
         CancellationToken cancellationToken);

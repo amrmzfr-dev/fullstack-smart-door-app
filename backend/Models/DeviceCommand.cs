@@ -26,6 +26,9 @@ public class DeviceCommand
     public CommandType Type { get; set; }
     public CommandStatus Status { get; set; } = CommandStatus.Pending;
 
+    // The door (controller) this command is for.
+    public Guid DoorId { get; set; }
+
     public int? Slot { get; set; }
     public Guid? MemberId { get; set; }
 

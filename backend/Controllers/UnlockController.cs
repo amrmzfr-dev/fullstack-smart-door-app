@@ -8,24 +8,32 @@ using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Controllers;
 
-// The public keypad app. No login: the PIN or the phone's fingerprint is the
-// proof. Nothing here ever says who opened the door.
+// The public keypad app. No login: the door's PIN or the phone's fingerprint
+// is the proof. Nothing here ever says who opened a door.
 [ApiController]
 [Route("api/unlock")]
 [AllowAnonymous]
 public class UnlockController(
+    IDoorService doorService,
     IDoorAccessService doorAccessService,
     IDoorStatusStore doorStatusStore,
     IPhoneKeyService phoneKeyService) : ControllerBase
 {
-    [HttpGet("status")]
-    public async Task<ActionResult<UnlockStatusResponse>> GetStatusAsync()
+    // Doors to pick from, each with the state its lock picture shows. Door
+    // state is null while a door is offline (its last report may be stale).
+    [HttpGet("doors")]
+    public async Task<ActionResult<IReadOnlyList<PublicDoorResponse>>> ListDoorsAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await doorStatusStore.GetAsync();
-        var online = snapshot is not null && await doorStatusStore.IsOnlineAsync();
-        return Ok(online
-            ? new UnlockStatusResponse(true, snapshot!.DoorOpen, snapshot.Locked)
-            : new UnlockStatusResponse(false, null, null));
+        var doors = await doorService.ListAsync(cancellationToken);
+        var responses = new List<PublicDoorResponse>(doors.Count);
+        foreach (var door in doors)
+        {
+            var online = await doorStatusStore.IsOnlineAsync(door.Id);
+            var snapshot = online ? await doorStatusStore.GetAsync(door.Id) : null;
+            responses.Add(new PublicDoorResponse(door.Id, door.Name, online, snapshot?.DoorOpen, snapshot?.Locked));
+        }
+
+        return Ok(responses);
     }
 
     [HttpPost("pin")]
@@ -34,11 +42,10 @@ public class UnlockController(
         [FromBody] PinUnlockRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await doorAccessService.UnlockWithPinAsync(request.Pin, cancellationToken);
+        var result = await doorAccessService.UnlockWithPinAsync(request.DoorId, request.Pin, cancellationToken);
         return this.ToActionResult(result, command => Accepted(UnlockProgressResponse.From(command)));
     }
 
-    // Poll after an unlock to learn whether the door actually opened.
     // With ?changedFrom=pending the reply is held (up to a few seconds) until
     // the status moves on, so the app hears the moment the door takes the
     // unlock instead of finding out on its next poll.
@@ -56,9 +63,11 @@ public class UnlockController(
 
     [HttpPost("phone/options")]
     [EnableRateLimiting(RateLimits.PinAttempts)]
-    public async Task<ActionResult<WebAuthnChallengeResponse>> StartPhoneUnlockAsync(CancellationToken cancellationToken)
+    public async Task<ActionResult<WebAuthnChallengeResponse>> StartPhoneUnlockAsync(
+        [FromBody] StartPhoneUnlockRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await phoneKeyService.StartUnlockAsync(cancellationToken);
+        var result = await phoneKeyService.StartUnlockAsync(request.DoorId, cancellationToken);
         return this.ToActionResult(result, challenge => Ok(ToResponse(challenge)));
     }
 
@@ -74,6 +83,7 @@ public class UnlockController(
         }
 
         var result = await doorAccessService.UnlockForMemberAsync(
+            request.DoorId,
             verified.Value!,
             AccessMethod.PhoneFingerprint,
             cancellationToken);

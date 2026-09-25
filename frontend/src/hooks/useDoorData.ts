@@ -1,27 +1,31 @@
 import { useCallback, useState } from "react";
 
 import { usePolling } from "@/hooks/usePolling";
-import { fetchDoorStatus, fetchEvents, fetchMembers } from "@/lib/door";
-import type { AccessEvent, DoorStatus, Member } from "@/types";
+import { fetchDoors, fetchEvents, fetchMembers } from "@/lib/door";
+import type { AccessEvent, Door, Member } from "@/types";
 
-const STATUS_POLL_MS = 2000; // matches the door's heartbeat interval
+const DOORS_POLL_MS = 2000;
 const EVENTS_POLL_MS = 4000;
 
-export function useDoorStatus() {
-  const [status, setStatus] = useState<DoorStatus | null>(null);
+// Every door with its live state and PIN state (admin).
+export function useDoors() {
+  const [doors, setDoors] = useState<Door[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      setStatus(await fetchDoorStatus());
+      setDoors(await fetchDoors());
       setError(null);
     } catch {
       setError("Couldn't reach the server");
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
-  usePolling(refresh, STATUS_POLL_MS);
-  return { status, error, refresh };
+  usePolling(refresh, DOORS_POLL_MS);
+  return { doors, loaded, error, refresh };
 }
 
 export function useEvents() {

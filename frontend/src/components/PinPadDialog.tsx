@@ -5,7 +5,7 @@ import { Keypad, PinDisplay, type KeypadKey } from "@/components/Keypad";
 import { Modal } from "@/components/Modal";
 import { errorMessage } from "@/lib/api";
 import { setDoorPin } from "@/lib/door";
-import type { DoorPinStatus } from "@/types";
+import type { Door } from "@/types";
 
 // Must match PinRules on the backend and PIN_MIN/MAX_LENGTH in the firmware.
 const PIN_MIN_LENGTH = 4;
@@ -14,16 +14,16 @@ const PIN_MAX_LENGTH = 4;
 type Phase = "enter" | "confirm";
 
 interface PinPadDialogProps {
-  // Whether a door PIN already exists (changes the title only).
-  replacing: boolean;
+  door: Door;
   onClose: () => void;
-  onSaved: (status: DoorPinStatus) => void;
+  onSaved: (door: Door) => void;
 }
 
 const DIGITS = new Set(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
-// Sets the one door PIN everyone uses (typed twice to avoid typos).
-export function PinPadDialog({ replacing, onClose, onSaved }: PinPadDialogProps) {
+// Sets a door's PIN, used by everyone at that door (typed twice to avoid
+// typos).
+export function PinPadDialog({ door, onClose, onSaved }: PinPadDialogProps) {
   const [phase, setPhase] = useState<Phase>("enter");
   const [firstEntry, setFirstEntry] = useState("");
   const [value, setValue] = useState("");
@@ -43,14 +43,14 @@ export function PinPadDialog({ replacing, onClose, onSaved }: PinPadDialogProps)
     async (pin: string) => {
       setSaving(true);
       try {
-        onSaved(await setDoorPin(pin));
+        onSaved(await setDoorPin(door.id, pin));
       } catch (err) {
         fail(errorMessage(err, "Couldn't save the PIN. Try again."));
       } finally {
         setSaving(false);
       }
     },
-    [onSaved, fail],
+    [door.id, onSaved, fail],
   );
 
   const handleKey = useCallback(
@@ -111,8 +111,8 @@ export function PinPadDialog({ replacing, onClose, onSaved }: PinPadDialogProps)
 
   return (
     <Modal
-      title={replacing ? "Change the door PIN" : "Set the door PIN"}
-      subtitle="One PIN for everyone — on the door and in the app"
+      title={door.pinSet ? `Change the ${door.name} PIN` : `Set the ${door.name} PIN`}
+      subtitle="One PIN for everyone at this door — on its keypad and in the app"
       onClose={onClose}
     >
       <div className="space-y-4">

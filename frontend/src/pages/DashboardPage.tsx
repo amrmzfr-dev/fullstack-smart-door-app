@@ -3,17 +3,17 @@ import { DoorClosed, LogOut, ScrollText, Users, Wifi, WifiOff, type LucideIcon }
 
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { useDoorStatus, useEvents } from "@/hooks/useDoorData";
+import { useDoors, useEvents } from "@/hooks/useDoorData";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { DoorTab } from "@/pages/DoorTab";
+import { DoorsTab } from "@/pages/DoorsTab";
 import { LogTab } from "@/pages/LogTab";
 import { PeopleTab } from "@/pages/PeopleTab";
 
-type Tab = "door" | "people" | "log";
+type Tab = "doors" | "people" | "log";
 
 const TABS: ReadonlyArray<{ key: Tab; label: string; icon: LucideIcon }> = [
-  { key: "door", label: "Door", icon: DoorClosed },
+  { key: "doors", label: "Doors", icon: DoorClosed },
   { key: "people", label: "People", icon: Users },
   { key: "log", label: "Log", icon: ScrollText },
 ];
@@ -26,11 +26,12 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ username, onLogout, theme, onToggleTheme }: DashboardPageProps) {
-  const [tab, setTab] = useState<Tab>("door");
-  const { status, error: statusError } = useDoorStatus();
+  const [tab, setTab] = useState<Tab>("doors");
+  const { doors, loaded: doorsLoaded, error: statusError, refresh: refreshDoors } = useDoors();
   const { events, loading: eventsLoading } = useEvents();
 
-  const online = status?.online ?? false;
+  const onlineCount = doors.filter((door) => door.online).length;
+  const online = onlineCount > 0;
 
   return (
     <div className="min-h-dvh bg-background pb-24 text-foreground sm:pb-10">
@@ -58,7 +59,7 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
               )}
             >
               {online && !statusError ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
-              {statusError ? "Server unreachable" : online ? "Door online" : "Door offline"}
+              {statusError ? "Server unreachable" : `${onlineCount} of ${doors.length} doors online`}
             </span>
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
             <Button variant="outline" size="icon" onClick={onLogout} aria-label={`Sign out ${username ?? ""}`.trim()}>
@@ -94,11 +95,18 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
             {statusError}
           </p>
         )}
-        {tab === "door" && (
-          <DoorTab status={status} events={events} eventsLoading={eventsLoading} onViewLog={() => setTab("log")} />
+        {tab === "doors" && (
+          <DoorsTab
+            doors={doors}
+            loaded={doorsLoaded}
+            events={events}
+            eventsLoading={eventsLoading}
+            onViewLog={() => setTab("log")}
+            onDoorsChanged={() => void refreshDoors()}
+          />
         )}
-        {tab === "people" && <PeopleTab doorOnline={online} />}
-        {tab === "log" && <LogTab events={events} loading={eventsLoading} />}
+        {tab === "people" && <PeopleTab doors={doors} />}
+        {tab === "log" && <LogTab events={events} doors={doors} loading={eventsLoading} />}
       </main>
 
       {/* Mobile bottom tab bar */}

@@ -74,6 +74,7 @@ builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IFingerprintService, FingerprintService>();
 builder.Services.AddScoped<IAccessEventService, AccessEventService>();
+builder.Services.AddScoped<IDoorService, DoorService>();
 builder.Services.AddScoped<IDoorPinService, DoorPinService>();
 builder.Services.AddScoped<IDoorAccessService, DoorAccessService>();
 builder.Services.AddScoped<IPhoneKeyService, PhoneKeyService>();
@@ -163,6 +164,7 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
     await UserSeeder.SeedAsync(dbContext, app.Configuration);
+    await DoorSeeder.SeedAsync(dbContext, app.Configuration);
 }
 
 app.UseCors("Frontend");

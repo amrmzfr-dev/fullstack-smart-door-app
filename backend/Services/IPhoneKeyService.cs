@@ -19,7 +19,7 @@ public interface IPhoneKeyService
         JsonElement credential,
         CancellationToken cancellationToken);
 
-    Task<ServiceResult<WebAuthnChallenge>> StartUnlockAsync(CancellationToken cancellationToken);
+    Task<ServiceResult<WebAuthnChallenge>> StartUnlockAsync(Guid doorId, CancellationToken cancellationToken);
 
     // Returns the member the phone belongs to once the signature checks out.
     Task<ServiceResult<Member>> FinishUnlockAsync(Guid flowId, JsonElement credential, CancellationToken cancellationToken);

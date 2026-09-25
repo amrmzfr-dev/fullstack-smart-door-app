@@ -15,6 +15,7 @@ public class MemberService(
             .AsNoTracking()
             .Include(m => m.Fingerprints)
             .Include(m => m.PhoneKeys)
+            .Include(m => m.Doors)
             .OrderBy(m => m.Name)
             .ToListAsync(cancellationToken);
 
@@ -27,6 +28,11 @@ public class MemberService(
         }
 
         var member = new Member { Id = Guid.NewGuid(), Name = cleanName };
+
+        // New people may open every door to start with; the admin switches
+        // doors off per person.
+        var doorIds = await dbContext.Doors.Select(d => d.Id).ToListAsync(cancellationToken);
+        member.Doors = doorIds.Select(doorId => new MemberDoor { MemberId = member.Id, DoorId = doorId }).ToList();
         dbContext.Members.Add(member);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ServiceResult<Member>.Ok(member);
@@ -56,6 +62,40 @@ public class MemberService(
         return ServiceResult<Member>.Ok(member);
     }
 
+    public async Task<ServiceResult<Member>> SetDoorsAsync(
+        Guid id,
+        IReadOnlyList<Guid> doorIds,
+        CancellationToken cancellationToken)
+    {
+        var member = await FindAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        var wanted = doorIds.Distinct().ToList();
+        var existingDoors = await dbContext.Doors
+            .Where(d => wanted.Contains(d.Id))
+            .Select(d => d.Id)
+            .ToListAsync(cancellationToken);
+        if (existingDoors.Count != wanted.Count)
+        {
+            return ServiceResult<Member>.Invalid("Unknown door.");
+        }
+
+        // Their fingerprints on a door they lose stop working there at once
+        // (the access list drops them); the templates stay, so switching the
+        // door back on restores them.
+        member.Doors.RemoveAll(md => !wanted.Contains(md.DoorId));
+        foreach (var doorId in wanted.Where(doorId => member.Doors.All(md => md.DoorId != doorId)))
+        {
+            member.Doors.Add(new MemberDoor { MemberId = member.Id, DoorId = doorId });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Member>.Ok(member);
+    }
+
     public async Task<ServiceResult<bool>> DeleteAsync(Guid id, string deletedBy, CancellationToken cancellationToken)
     {
         var member = await FindAsync(id, cancellationToken);
@@ -69,7 +109,7 @@ public class MemberService(
         // the sensor itself.
         foreach (var fingerprint in member.Fingerprints)
         {
-            commandService.AddDeleteFingerprint(fingerprint.Slot, deletedBy);
+            commandService.AddDeleteFingerprint(fingerprint.DoorId, fingerprint.Slot, deletedBy);
         }
 
         dbContext.Members.Remove(member);
@@ -81,6 +121,7 @@ public class MemberService(
         dbContext.Members
             .Include(m => m.Fingerprints)
             .Include(m => m.PhoneKeys)
+            .Include(m => m.Doors)
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
 
     private static string? CleanName(string? name)

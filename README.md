@@ -9,6 +9,20 @@ backend/    ASP.NET Core (.NET 10) + PostgreSQL + Redis
 firmware/   ESP32 door controller (PlatformIO)
 ```
 
+## Doors
+
+Several doors, one ESP32 controller each (Main Glass Door, Technical Office,
+Management Office, …), managed in the admin dashboard's **Doors** tab.
+
+- Each door has its own **PIN** (for everyone at that door) and its own
+  **key** — `DOOR_ID` + `DEVICE_API_KEY` in that controller's `secrets.h`,
+  shown once by **Set up controller** / **Add door**. All controllers share
+  the MQTT `door` login (`MQTT_PASSWORD`).
+- **People** get a switch per door. Door-sensor fingerprints are stored on
+  that door's sensor, so they're enrolled per door; phone fingerprints work on
+  every door the person is allowed on.
+- The keypad app opens the door picked in its sidebar (remembered per phone).
+
 ## How the parts talk
 
 - **MQTT (always-on, the fast path):** the door keeps one TLS connection to

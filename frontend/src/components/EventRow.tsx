@@ -70,7 +70,11 @@ export function EventRow({ event }: { event: AccessEvent }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{description.title}</p>
-        {description.detail && <p className="truncate text-xs text-muted-foreground">{description.detail}</p>}
+        {(event.doorName || description.detail) && (
+          <p className="truncate text-xs text-muted-foreground">
+            {[event.doorName, description.detail].filter(Boolean).join(" · ")}
+          </p>
+        )}
       </div>
       <div className="flex flex-none flex-col items-end gap-1">
         <span

@@ -12,13 +12,23 @@
 #include "access_list.h"
 #include "secrets.h"
 
+// Which door this controller is — its ID from the admin dashboard.
+#ifndef DOOR_ID
+#error "Set DOOR_ID in include/secrets.h (the door's ID from the admin dashboard)"
+#endif
+
+// Older secrets.h files used the device key as the MQTT password.
+#ifndef MQTT_PASSWORD
+#define MQTT_PASSWORD DEVICE_API_KEY
+#endif
+
 namespace {
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "2.0.0";
+constexpr char FIRMWARE_VERSION[] = "2.1.0";
 
 // Also how often app unlocks are picked up, so kept short. A door open/close
 // or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
@@ -31,12 +41,14 @@ constexpr uint16_t HTTP_TIMEOUT_MS = 4000;
 constexpr uint32_t NET_LOOP_DELAY_MS = 20;
 
 // MQTT (must match backend/Mqtt/DoorMqttTopics.cs and mosquitto/acl).
-constexpr char MQTT_USERNAME[] = "door";  // password = DEVICE_API_KEY
-constexpr char MQTT_TOPIC_CMD[] = "smartdoor/door/cmd";
-constexpr char MQTT_TOPIC_ACCESS[] = "smartdoor/door/access";
-constexpr char MQTT_TOPIC_STATUS[] = "smartdoor/door/status";
-constexpr char MQTT_TOPIC_REPORT[] = "smartdoor/door/report";
-constexpr char MQTT_TOPIC_ONLINE[] = "smartdoor/door/online";
+// Every door controller logs in as "door" (shared MQTT_PASSWORD) and only
+// uses its own topics: smartdoor/door/<DOOR_ID>/<kind>.
+constexpr char MQTT_USERNAME[] = "door";
+constexpr char MQTT_TOPIC_CMD[] = "smartdoor/door/" DOOR_ID "/cmd";
+constexpr char MQTT_TOPIC_ACCESS[] = "smartdoor/door/" DOOR_ID "/access";
+constexpr char MQTT_TOPIC_STATUS[] = "smartdoor/door/" DOOR_ID "/status";
+constexpr char MQTT_TOPIC_REPORT[] = "smartdoor/door/" DOOR_ID "/report";
+constexpr char MQTT_TOPIC_ONLINE[] = "smartdoor/door/" DOOR_ID "/online";
 constexpr uint32_t MQTT_RETRY_INTERVAL_MS = 10000;
 // Status goes out on every change; this keeps "last seen" fresh when nothing
 // changes (the backend calls the door offline after 10s of silence).
@@ -368,7 +380,7 @@ bool ensureMqtt(uint32_t now) {
   snprintf(clientId, sizeof(clientId), "smartdoor-door-%06llx", ESP.getEfuseMac() & 0xFFFFFFULL);
   // Last will: the broker announces "0" the moment this connection drops,
   // so the app shows the door offline straight away.
-  if (!mqtt.connect(clientId, MQTT_USERNAME, DEVICE_API_KEY, MQTT_TOPIC_ONLINE, 1, true, "0", true)) {
+  if (!mqtt.connect(clientId, MQTT_USERNAME, MQTT_PASSWORD, MQTT_TOPIC_ONLINE, 1, true, "0", true)) {
     Serial.printf("[MQTT] connect failed (state %d) — using REST meanwhile\n", mqtt.state());
     return false;
   }

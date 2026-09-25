@@ -5,6 +5,6 @@ namespace SmartDoor.Api.Services;
 
 public interface IAccessEventService
 {
-    Task RecordDeviceEventsAsync(IReadOnlyList<DeviceEvent> events, CancellationToken cancellationToken);
+    Task RecordDeviceEventsAsync(Door door, IReadOnlyList<DeviceEvent> events, CancellationToken cancellationToken);
     Task<IReadOnlyList<AccessEvent>> ListAsync(int limit, CancellationToken cancellationToken);
 }

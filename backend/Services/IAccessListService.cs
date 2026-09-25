@@ -4,5 +4,5 @@ namespace SmartDoor.Api.Services;
 
 public interface IAccessListService
 {
-    Task<AccessList> BuildAsync(CancellationToken cancellationToken);
+    Task<AccessList> BuildAsync(Guid doorId, CancellationToken cancellationToken);
 }

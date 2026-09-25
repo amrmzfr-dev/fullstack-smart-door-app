@@ -5,7 +5,7 @@ import { SectionHeading, SectionLabel } from "@/components/SectionLabel";
 import { describeEvent, type EventCategory } from "@/lib/events";
 import { dayKey, formatDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { AccessEvent } from "@/types";
+import type { AccessEvent, Door } from "@/types";
 
 type Filter = "all" | EventCategory;
 
@@ -38,15 +38,43 @@ function groupByDay(events: AccessEvent[]): DayGroup[] {
   return groups;
 }
 
-export function LogTab({ events, loading }: { events: AccessEvent[]; loading: boolean }) {
-  const [filter, setFilter] = useState<Filter>("all");
+interface LogTabProps {
+  events: AccessEvent[];
+  doors: Door[];
+  loading: boolean;
+}
 
-  const filtered = filter === "all" ? events : events.filter((event) => describeEvent(event).category === filter);
+export function LogTab({ events, doors, loading }: LogTabProps) {
+  const [filter, setFilter] = useState<Filter>("all");
+  // "all" or one door's ID.
+  const [doorFilter, setDoorFilter] = useState("all");
+
+  const filtered = events.filter(
+    (event) =>
+      (filter === "all" || describeEvent(event).category === filter) &&
+      (doorFilter === "all" || event.doorId === doorFilter),
+  );
   const groups = groupByDay(filtered);
 
   return (
     <div className="space-y-4">
-      <SectionHeading label="Log" title="Everything the door saw" />
+      <SectionHeading label="Log" title="Everything the doors saw">
+        {doors.length > 1 && (
+          <select
+            value={doorFilter}
+            onChange={(event) => setDoorFilter(event.target.value)}
+            aria-label="Filter by door"
+            className="h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground"
+          >
+            <option value="all">All doors</option>
+            {doors.map((door) => (
+              <option key={door.id} value={door.id}>
+                {door.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </SectionHeading>
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(({ key, label }) => (

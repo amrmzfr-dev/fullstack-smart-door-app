@@ -11,7 +11,10 @@ public class AccessEventService(AppDbContext dbContext) : IAccessEventService
     private const int MaxListLimit = 500;
     private static readonly TimeSpan MaxEventAge = TimeSpan.FromDays(7);
 
-    public async Task RecordDeviceEventsAsync(IReadOnlyList<DeviceEvent> events, CancellationToken cancellationToken)
+    public async Task RecordDeviceEventsAsync(
+        Door door,
+        IReadOnlyList<DeviceEvent> events,
+        CancellationToken cancellationToken)
     {
         var batch = events.Take(MaxEventsPerBatch).ToList();
         if (batch.Count == 0)
@@ -20,11 +23,11 @@ public class AccessEventService(AppDbContext dbContext) : IAccessEventService
         }
 
         // Resolve who each event belongs to: a fingerprint slot maps through
-        // the Fingerprints table, a keypad PIN arrives with its member ID.
+        // this door's fingerprints, a keypad PIN arrives with its member ID.
         var slots = batch.Where(e => e.FingerprintSlot is not null).Select(e => e.FingerprintSlot!.Value).Distinct().ToList();
         var fingerprintOwners = await dbContext.Fingerprints
             .AsNoTracking()
-            .Where(f => slots.Contains(f.Slot))
+            .Where(f => f.DoorId == door.Id && slots.Contains(f.Slot))
             .Select(f => new { f.Slot, f.MemberId })
             .ToDictionaryAsync(f => f.Slot, f => f.MemberId, cancellationToken);
 
@@ -57,6 +60,8 @@ public class AccessEventService(AppDbContext dbContext) : IAccessEventService
                 Method = deviceEvent.Method,
                 MemberId = memberName is null ? null : memberId,
                 MemberName = memberName,
+                DoorId = door.Id,
+                DoorName = door.Name,
                 FingerprintSlot = deviceEvent.FingerprintSlot,
                 OccurredAt = now - age,
                 ReceivedAt = now,

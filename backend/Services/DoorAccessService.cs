@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SmartDoor.Api.Data;
 using SmartDoor.Api.Models;
 
@@ -10,24 +11,32 @@ public class DoorAccessService(
     IDeviceCommandService commandService) : IDoorAccessService
 {
     private const string WrongPin = "Wrong PIN.";
-    private const string DoorOffline = "The door is offline right now.";
+    private const string DoorOffline = "This door is offline right now.";
+    private const string NoSuchDoor = "Door not found.";
 
     // Waiting for an unlock to change: how long to hold the request, and how
     // often to look at the database meanwhile.
     private static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMilliseconds(50);
 
-    public Task<bool> IsDoorOnlineAsync() => doorStatusStore.IsOnlineAsync();
-
-    public async Task<ServiceResult<DeviceCommand>> UnlockWithPinAsync(string pin, CancellationToken cancellationToken)
+    public async Task<ServiceResult<DeviceCommand>> UnlockWithPinAsync(
+        Guid doorId,
+        string pin,
+        CancellationToken cancellationToken)
     {
+        var door = await dbContext.Doors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == doorId, cancellationToken);
+        if (door is null)
+        {
+            return ServiceResult<DeviceCommand>.NotFound(NoSuchDoor);
+        }
+
         // Checked before the PIN so a guess isn't used up on an offline door.
-        if (!await doorStatusStore.IsOnlineAsync())
+        if (!await doorStatusStore.IsOnlineAsync(doorId))
         {
             return ServiceResult<DeviceCommand>.Conflict(DoorOffline);
         }
 
-        if (!await doorPinService.VerifyAsync(pin, cancellationToken))
+        if (!await doorPinService.VerifyAsync(doorId, pin, cancellationToken))
         {
             // Logged so wrong guesses show up in the admin log.
             dbContext.AccessEvents.Add(new AccessEvent
@@ -35,6 +44,8 @@ public class DoorAccessService(
                 Id = Guid.NewGuid(),
                 Type = AccessEventType.Denied,
                 Method = AccessMethod.AppPin,
+                DoorId = door.Id,
+                DoorName = door.Name,
                 OccurredAt = DateTimeOffset.UtcNow,
             });
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -42,21 +53,34 @@ public class DoorAccessService(
         }
 
         return ServiceResult<DeviceCommand>.Ok(
-            await commandService.QueueUnlockAsync(null, AccessMethod.AppPin, cancellationToken));
+            await commandService.QueueUnlockAsync(doorId, null, AccessMethod.AppPin, cancellationToken));
     }
 
     public async Task<ServiceResult<DeviceCommand>> UnlockForMemberAsync(
+        Guid doorId,
         Member member,
         AccessMethod method,
         CancellationToken cancellationToken)
     {
-        if (!await doorStatusStore.IsOnlineAsync())
+        if (!await dbContext.Doors.AnyAsync(d => d.Id == doorId, cancellationToken))
+        {
+            return ServiceResult<DeviceCommand>.NotFound(NoSuchDoor);
+        }
+
+        var allowed = await dbContext.MemberDoors
+            .AnyAsync(md => md.MemberId == member.Id && md.DoorId == doorId, cancellationToken);
+        if (!allowed)
+        {
+            return ServiceResult<DeviceCommand>.Invalid("You can't open this door.");
+        }
+
+        if (!await doorStatusStore.IsOnlineAsync(doorId))
         {
             return ServiceResult<DeviceCommand>.Conflict(DoorOffline);
         }
 
         return ServiceResult<DeviceCommand>.Ok(
-            await commandService.QueueUnlockAsync(member, method, cancellationToken));
+            await commandService.QueueUnlockAsync(doorId, member, method, cancellationToken));
     }
 
     public async Task<ServiceResult<DeviceCommand>> WaitForUnlockChangeAsync(

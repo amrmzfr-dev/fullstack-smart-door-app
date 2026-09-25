@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MQTTnet;
@@ -8,11 +9,11 @@ using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Mqtt;
 
-// Always-on link to the door through the MQTT broker:
-//   - pushes queued commands to the door the moment they're created
-//   - takes the door's status / command reports / online state as they happen
-//   - publishes the access-list version (retained) so the door re-syncs
-// The REST device endpoints stay as the door's fallback when MQTT is down.
+// Always-on link to every door through the MQTT broker:
+//   - pushes queued commands to a door the moment they're created
+//   - takes each door's status / command reports / online state as they happen
+//   - publishes each door's access-list version (retained) so it re-syncs
+// The REST device endpoints stay as a door's fallback when MQTT is down.
 // Turned off when Mqtt:Host is not configured.
 public sealed class DoorMqttHostedService(
     IServiceScopeFactory scopeFactory,
@@ -30,12 +31,15 @@ public sealed class DoorMqttHostedService(
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false) },
     };
 
-    private string? publishedAccessVersion;
+    // Doors currently connected to the broker themselves (retained "online" =
+    // "1"). Commands only go out over MQTT to these; any other door keeps
+    // getting them through its REST heartbeat.
+    private readonly ConcurrentDictionary<Guid, bool> doorsOnMqtt = new();
+    private readonly Dictionary<Guid, string> publishedAccessVersions = [];
 
-    // True while the door itself is connected to the broker (its retained
-    // "online" = "1"). Door firmware without MQTT never sets it, so its
-    // commands keep going out through the REST heartbeat instead.
-    private volatile bool doorOnMqtt;
+    // Door IDs that exist, refreshed every round — messages for anything else
+    // are ignored.
+    private volatile HashSet<Guid> knownDoors = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -61,6 +65,10 @@ public sealed class DoorMqttHostedService(
         {
             try
             {
+                // Before connecting, so the retained messages that arrive on
+                // subscribe are matched against real doors.
+                await RefreshKnownDoorsAsync(stoppingToken);
+
                 if (!client.IsConnected)
                 {
                     var options = new MqttClientOptionsBuilder()
@@ -71,20 +79,24 @@ public sealed class DoorMqttHostedService(
                         .Build();
                     await client.ConnectAsync(options, stoppingToken);
 
+                    // Until each door's retained "online" arrives again.
+                    doorsOnMqtt.Clear();
+                    publishedAccessVersions.Clear();
+
                     var subscribe = factory.CreateSubscribeOptionsBuilder()
-                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.Status).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.Report).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.Online).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.StatusWildcard).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.ReportWildcard).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+                        .WithTopicFilter(f => f.WithTopic(DoorMqttTopics.OnlineWildcard).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
                         .Build();
                     await client.SubscribeAsync(subscribe, stoppingToken);
-
-                    doorOnMqtt = false; // until the door's retained "online" arrives again
-                    publishedAccessVersion = null; // re-publish after every (re)connect
                     logger.LogInformation("MQTT door link connected to {Host}:{Port}", host, port);
                 }
 
-                await PublishAccessVersionAsync(client, stoppingToken);
-                await PublishPendingCommandsAsync(client, stoppingToken);
+                foreach (var doorId in knownDoors)
+                {
+                    await PublishAccessVersionAsync(client, doorId, stoppingToken);
+                    await PublishPendingCommandsAsync(client, doorId, stoppingToken);
+                }
 
                 // Sleep until a command is queued, or the next round.
                 await commandSignal.WaitAsync(RoundInterval, stoppingToken);
@@ -106,12 +118,19 @@ public sealed class DoorMqttHostedService(
         }
     }
 
-    private async Task PublishPendingCommandsAsync(IMqttClient client, CancellationToken cancellationToken)
+    private async Task RefreshKnownDoorsAsync(CancellationToken cancellationToken)
     {
-        // The door connects with a clean session, so anything published while
-        // it isn't listening would be lost — leave commands pending (for its
-        // next MQTT connection or its REST heartbeat) until it is.
-        if (!doorOnMqtt)
+        using var scope = scopeFactory.CreateScope();
+        var doors = await scope.ServiceProvider.GetRequiredService<IDoorService>().ListAsync(cancellationToken);
+        knownDoors = doors.Select(d => d.Id).ToHashSet();
+    }
+
+    private async Task PublishPendingCommandsAsync(IMqttClient client, Guid doorId, CancellationToken cancellationToken)
+    {
+        // A door connects with a clean session, so anything published while it
+        // isn't listening would be lost — leave commands pending (for its next
+        // MQTT connection or its REST heartbeat) until it is.
+        if (!doorsOnMqtt.ContainsKey(doorId))
         {
             return;
         }
@@ -119,29 +138,30 @@ public sealed class DoorMqttHostedService(
         using var scope = scopeFactory.CreateScope();
         var commands = await scope.ServiceProvider
             .GetRequiredService<IDeviceCommandService>()
-            .TakePendingForDeviceAsync(cancellationToken);
+            .TakePendingForDeviceAsync(doorId, cancellationToken);
 
         foreach (var command in commands)
         {
-            await PublishAsync(client, DoorMqttTopics.Command, JsonSerializer.Serialize(DeviceCommandDto.From(command), Json), retain: false, cancellationToken);
-            logger.LogInformation("MQTT pushed {Type} command {Id} to the door", command.Type, command.Id);
+            var payload = JsonSerializer.Serialize(DeviceCommandDto.From(command), Json);
+            await PublishAsync(client, DoorMqttTopics.Command(doorId), payload, retain: false, cancellationToken);
+            logger.LogInformation("MQTT pushed {Type} command {Id} to door {DoorId}", command.Type, command.Id, doorId);
         }
     }
 
-    private async Task PublishAccessVersionAsync(IMqttClient client, CancellationToken cancellationToken)
+    private async Task PublishAccessVersionAsync(IMqttClient client, Guid doorId, CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var accessList = await scope.ServiceProvider
             .GetRequiredService<IAccessListService>()
-            .BuildAsync(cancellationToken);
+            .BuildAsync(doorId, cancellationToken);
 
-        if (accessList.Version == publishedAccessVersion)
+        if (publishedAccessVersions.TryGetValue(doorId, out var published) && published == accessList.Version)
         {
             return;
         }
 
-        await PublishAsync(client, DoorMqttTopics.Access, accessList.Version, retain: true, cancellationToken);
-        publishedAccessVersion = accessList.Version;
+        await PublishAsync(client, DoorMqttTopics.Access(doorId), accessList.Version, retain: true, cancellationToken);
+        publishedAccessVersions[doorId] = accessList.Version;
     }
 
     private static Task PublishAsync(IMqttClient client, string topic, string payload, bool retain, CancellationToken cancellationToken) =>
@@ -156,32 +176,32 @@ public sealed class DoorMqttHostedService(
 
     private async Task HandleMessageAsync(string topic, string? payload, CancellationToken cancellationToken)
     {
-        if (payload is null)
+        if (payload is null || DoorMqttTopics.Parse(topic) is not var (doorId, kind) || !knownDoors.Contains(doorId))
         {
             return;
         }
 
         try
         {
-            switch (topic)
+            switch (kind)
             {
-                case DoorMqttTopics.Status:
-                    await HandleStatusAsync(payload);
+                case "status":
+                    await HandleStatusAsync(doorId, payload);
                     break;
 
-                case DoorMqttTopics.Report:
-                    await HandleReportAsync(payload, cancellationToken);
+                case "report":
+                    await HandleReportAsync(doorId, payload, cancellationToken);
                     break;
 
-                case DoorMqttTopics.Online when payload == "1":
-                    doorOnMqtt = true;
+                case "online" when payload == "1":
+                    doorsOnMqtt[doorId] = true;
                     commandSignal.Notify();
                     break;
 
-                case DoorMqttTopics.Online when payload == "0":
-                    doorOnMqtt = false;
-                    await statusStore.MarkOfflineAsync();
-                    logger.LogInformation("MQTT: door went offline");
+                case "online" when payload == "0":
+                    doorsOnMqtt.TryRemove(doorId, out _);
+                    await statusStore.MarkOfflineAsync(doorId);
+                    logger.LogInformation("MQTT: door {DoorId} went offline", doorId);
                     break;
             }
         }
@@ -191,7 +211,7 @@ public sealed class DoorMqttHostedService(
         }
     }
 
-    private async Task HandleStatusAsync(string payload)
+    private async Task HandleStatusAsync(Guid doorId, string payload)
     {
         var status = JsonSerializer.Deserialize<HeartbeatRequest>(payload, Json);
         if (status is null)
@@ -199,7 +219,7 @@ public sealed class DoorMqttHostedService(
             return;
         }
 
-        await statusStore.SaveAsync(new DoorStatusSnapshot(
+        await statusStore.SaveAsync(doorId, new DoorStatusSnapshot(
             status.DoorOpen,
             status.Locked,
             status.FingerprintReady,
@@ -214,7 +234,7 @@ public sealed class DoorMqttHostedService(
         commandSignal.Notify();
     }
 
-    private async Task HandleReportAsync(string payload, CancellationToken cancellationToken)
+    private async Task HandleReportAsync(Guid doorId, string payload, CancellationToken cancellationToken)
     {
         var report = JsonSerializer.Deserialize<MqttCommandReport>(payload, Json);
         if (report is null)
@@ -225,6 +245,6 @@ public sealed class DoorMqttHostedService(
         using var scope = scopeFactory.CreateScope();
         await scope.ServiceProvider
             .GetRequiredService<IDeviceCommandService>()
-            .ApplyDeviceUpdateAsync(report.Id, new DeviceCommandUpdate(report.Status, report.Step, report.Message), cancellationToken);
+            .ApplyDeviceUpdateAsync(doorId, report.Id, new DeviceCommandUpdate(report.Status, report.Step, report.Message), cancellationToken);
     }
 }

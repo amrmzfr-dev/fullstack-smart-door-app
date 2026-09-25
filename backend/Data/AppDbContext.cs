@@ -6,12 +6,13 @@ namespace SmartDoor.Api.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Door> Doors => Set<Door>();
+    public DbSet<MemberDoor> MemberDoors => Set<MemberDoor>();
     public DbSet<Member> Members => Set<Member>();
     public DbSet<Fingerprint> Fingerprints => Set<Fingerprint>();
     public DbSet<AccessEvent> AccessEvents => Set<AccessEvent>();
     public DbSet<DeviceCommand> DeviceCommands => Set<DeviceCommand>();
     public DbSet<PhoneKey> PhoneKeys => Set<PhoneKey>();
-    public DbSet<DoorSettings> DoorSettings => Set<DoorSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +24,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(u => u.Username).IsUnique();
         });
 
+        modelBuilder.Entity<Door>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Name).IsRequired().HasMaxLength(64);
+            entity.Property(d => d.KeyHash).HasMaxLength(64);
+            entity.HasIndex(d => d.KeyHash).IsUnique();
+            entity.Property(d => d.PinSalt).HasMaxLength(32);
+            entity.Property(d => d.PinHash).HasMaxLength(64);
+        });
+
         modelBuilder.Entity<Member>(entity =>
         {
             entity.HasKey(m => m.Id);
@@ -30,23 +41,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(m => m.Enabled).HasDefaultValue(true);
         });
 
+        modelBuilder.Entity<MemberDoor>(entity =>
+        {
+            entity.HasKey(md => new { md.MemberId, md.DoorId });
+            entity.HasOne<Member>()
+                .WithMany(m => m.Doors)
+                .HasForeignKey(md => md.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Door>()
+                .WithMany()
+                .HasForeignKey(md => md.DoorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Fingerprint>(entity =>
         {
             entity.HasKey(f => f.Id);
             entity.Property(f => f.Label).IsRequired().HasMaxLength(64);
-            entity.HasIndex(f => f.Slot).IsUnique();
+            entity.Property(f => f.DoorId).HasDefaultValue(Door.MainDoorId);
+            // Slots belong to each door's own sensor.
+            entity.HasIndex(f => new { f.DoorId, f.Slot }).IsUnique();
             entity.HasOne(f => f.Member)
                 .WithMany(m => m.Fingerprints)
                 .HasForeignKey(f => f.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<DoorSettings>(entity =>
-        {
-            entity.HasKey(s => s.Id);
-            entity.Property(s => s.Id).ValueGeneratedNever();
-            entity.Property(s => s.PinSalt).HasMaxLength(32);
-            entity.Property(s => s.PinHash).HasMaxLength(64);
+            entity.HasOne<Door>()
+                .WithMany()
+                .HasForeignKey(f => f.DoorId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PhoneKey>(entity =>
@@ -68,6 +90,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.Method).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.MemberName).HasMaxLength(64);
+            entity.Property(e => e.DoorName).HasMaxLength(64);
             entity.Property(e => e.Username).HasMaxLength(64);
             entity.HasIndex(e => e.OccurredAt);
         });
@@ -75,6 +98,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<DeviceCommand>(entity =>
         {
             entity.HasKey(c => c.Id);
+            entity.Property(c => c.DoorId).HasDefaultValue(Door.MainDoorId);
             entity.Property(c => c.Type).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.Method).HasConversion<string>().HasMaxLength(32);
@@ -83,7 +107,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(c => c.Message).HasMaxLength(256);
             entity.Property(c => c.CreatedBy).IsRequired().HasMaxLength(64);
             entity.Ignore(c => c.IsActive);
-            entity.HasIndex(c => new { c.Status, c.CreatedAt });
+            entity.HasIndex(c => new { c.DoorId, c.Status, c.CreatedAt });
+            entity.HasOne<Door>()
+                .WithMany()
+                .HasForeignKey(c => c.DoorId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

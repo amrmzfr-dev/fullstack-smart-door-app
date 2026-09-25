@@ -36,7 +36,11 @@ export interface LoginResponse {
   username: string;
 }
 
-export interface DoorStatus {
+// A door (one controller) as the admin sees it. Live state is null while the
+// door is offline or has never connected. Never the PIN or key itself.
+export interface Door {
+  id: string;
+  name: string;
   online: boolean;
   lastSeenAt: string | null;
   doorOpen: boolean | null;
@@ -46,10 +50,24 @@ export interface DoorStatus {
   firmwareVersion: string | null;
   ipAddress: string | null;
   rssi: number | null;
+  pinSet: boolean;
+  pinUpdatedAt: string | null;
+  createdAt: string;
 }
 
+// What goes into a door controller's secrets.h — shown once.
+export interface DoorSetup {
+  door: Door;
+  deviceKey: string;
+  mqttHost: string | null;
+  mqttPort: number | null;
+  mqttPassword: string | null;
+}
+
+// Stored on one door's sensor, so it only works on that door.
 export interface Fingerprint {
   id: string;
+  doorId: string;
   slot: number;
   label: string;
   enrolledAt: string;
@@ -66,15 +84,11 @@ export interface Member {
   id: string;
   name: string;
   enabled: boolean;
+  // Doors this person may open.
+  doorIds: string[];
   fingerprints: Fingerprint[];
   phones: PhoneKey[];
   createdAt: string;
-}
-
-// The one door PIN everyone uses. Never the PIN itself.
-export interface DoorPinStatus {
-  isSet: boolean;
-  updatedAt: string | null;
 }
 
 export interface DeviceCommand {
@@ -94,6 +108,8 @@ export interface AccessEvent {
   method: AccessMethod;
   memberId: string | null;
   memberName: string | null;
+  doorId: string | null;
+  doorName: string | null;
   username: string | null;
   fingerprintSlot: number | null;
   occurredAt: string;
@@ -101,8 +117,11 @@ export interface AccessEvent {
 
 // ---- Public keypad app ----
 
-// doorOpen / locked are null while the door is offline.
-export interface UnlockStatus {
+// A door in the keypad app's picker. doorOpen / locked are null while it's
+// offline.
+export interface PublicDoor {
+  id: string;
+  name: string;
   online: boolean;
   doorOpen: boolean | null;
   locked: boolean | null;

@@ -2,27 +2,38 @@ using SmartDoor.Api.Models;
 
 namespace SmartDoor.Api.Mqtt;
 
-// Must match the topics in firmware/door-controller/src/door_link.cpp and the
-// broker's ACL (mosquitto/acl): the door may only read Command/Access and
-// write Status/Report/Online.
+// smartdoor/door/{doorId}/{kind}. Must match firmware/door-controller/src/
+// door_link.cpp and the broker's ACL (mosquitto/acl): doors may only read
+// cmd/access and write status/report/online.
 public static class DoorMqttTopics
 {
-    // backend -> door: one command per message ({ id, type, slot }).
-    public const string Command = "smartdoor/door/cmd";
+    private const string Prefix = "smartdoor/door/";
 
-    // backend -> door, retained: current access-list version. The door
-    // downloads the list over REST when it differs from its own.
-    public const string Access = "smartdoor/door/access";
+    // backend -> door: one command per message ({ id, type, slot }).
+    public static string Command(Guid doorId) => $"{Prefix}{doorId}/cmd";
+
+    // backend -> door, retained: the door's current access-list version. The
+    // door downloads the list over REST when it differs from its own.
+    public static string Access(Guid doorId) => $"{Prefix}{doorId}/access";
 
     // door -> backend: same fields as the REST heartbeat, sent on every change.
-    public const string Status = "smartdoor/door/status";
+    public const string StatusWildcard = Prefix + "+/status";
 
     // door -> backend: command progress / result ({ id, status, step, message }).
-    public const string Report = "smartdoor/door/report";
+    public const string ReportWildcard = Prefix + "+/report";
 
     // door -> backend, retained: "1" on connect; the broker publishes the
     // door's last will "0" the moment the connection drops.
-    public const string Online = "smartdoor/door/online";
+    public const string OnlineWildcard = Prefix + "+/online";
+
+    // "smartdoor/door/{doorId}/{kind}" -> (doorId, kind), or null.
+    public static (Guid DoorId, string Kind)? Parse(string topic)
+    {
+        var parts = topic.Split('/');
+        return parts is ["smartdoor", "door", var id, var kind] && Guid.TryParse(id, out var doorId)
+            ? (doorId, kind)
+            : null;
+    }
 }
 
 public sealed record MqttCommandReport(Guid Id, CommandStatus Status, string? Step, string? Message);

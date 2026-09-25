@@ -1,11 +1,11 @@
-# Who may use which topics. The door can't publish commands to itself, so a
-# leaked door password can't open the door.
+# Who may use which topics. Topics are smartdoor/door/<door id>/<kind>.
+# Doors can't publish commands, so a leaked door password can't open a door.
 user backend
 topic readwrite smartdoor/#
 
 user door
-topic read smartdoor/door/cmd
-topic read smartdoor/door/access
-topic write smartdoor/door/status
-topic write smartdoor/door/report
-topic write smartdoor/door/online
+topic read smartdoor/door/+/cmd
+topic read smartdoor/door/+/access
+topic write smartdoor/door/+/status
+topic write smartdoor/door/+/report
+topic write smartdoor/door/+/online

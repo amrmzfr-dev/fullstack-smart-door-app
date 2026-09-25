@@ -11,18 +11,19 @@ import type {
   PhoneInviteInfo,
   PhoneSetupResult,
   UnlockProgress,
-  UnlockStatus,
+  PublicDoor,
   WebAuthnChallenge,
 } from "@/types";
 
 // Public keypad app — none of these need a login.
 
-export function fetchUnlockStatus(): Promise<UnlockStatus> {
-  return apiGet<UnlockStatus>("/unlock/status");
+// Doors to pick from, each with the state its lock picture shows.
+export function fetchPublicDoors(): Promise<PublicDoor[]> {
+  return apiGet<PublicDoor[]>("/unlock/doors");
 }
 
-export function unlockWithPin(pin: string): Promise<UnlockProgress> {
-  return apiPost<UnlockProgress>("/unlock/pin", { pin });
+export function unlockWithPin(doorId: string, pin: string): Promise<UnlockProgress> {
+  return apiPost<UnlockProgress>("/unlock/pin", { doorId, pin });
 }
 
 // While the unlock is waiting for the door ("pending") or just taken by it
@@ -34,10 +35,10 @@ export function fetchUnlock(id: string, current?: CommandStatus): Promise<Unlock
 }
 
 // Asks the phone for its fingerprint / face, then sends the signed answer.
-export async function unlockWithPhone(): Promise<UnlockProgress> {
-  const challenge = await apiPost<WebAuthnChallenge<RequestOptionsJson>>("/unlock/phone/options");
+export async function unlockWithPhone(doorId: string): Promise<UnlockProgress> {
+  const challenge = await apiPost<WebAuthnChallenge<RequestOptionsJson>>("/unlock/phone/options", { doorId });
   const credential = await getPhoneAssertion(challenge.options);
-  return apiPost<UnlockProgress>("/unlock/phone", { flowId: challenge.flowId, credential });
+  return apiPost<UnlockProgress>("/unlock/phone", { flowId: challenge.flowId, doorId, credential });
 }
 
 // ---- Phone setup through a one-time link (opened on the person's phone) ----

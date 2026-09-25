@@ -18,6 +18,7 @@ public class FingerprintsController(IFingerprintService fingerprintService) : Co
     {
         var result = await fingerprintService.StartEnrollmentAsync(
             memberId,
+            request.DoorId,
             request.Label,
             this.CurrentUsername(),
             cancellationToken);

@@ -10,15 +10,15 @@ import { SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { useMembers } from "@/hooks/useDoorData";
 import { errorMessage } from "@/lib/api";
-import { deleteFingerprint, deleteMember, deletePhoneKey, updateMember } from "@/lib/door";
+import { deleteFingerprint, deleteMember, deletePhoneKey, setMemberDoors, updateMember } from "@/lib/door";
 import { cn } from "@/lib/utils";
-import type { Fingerprint, Member, PhoneKey } from "@/types";
+import type { Door, Fingerprint, Member, PhoneKey } from "@/types";
 
 const NOTICE_MS = 4000;
 
 type Dialog =
   | { kind: "add" }
-  | { kind: "enroll"; member: Member }
+  | { kind: "enroll"; member: Member; door: Door }
   | { kind: "phone-invite"; member: Member }
   | { kind: "delete-member"; member: Member }
   | { kind: "delete-fingerprint"; member: Member; fingerprint: Fingerprint }
@@ -29,7 +29,7 @@ interface Notice {
   text: string;
 }
 
-export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
+export function PeopleTab({ doors }: { doors: Door[] }) {
   const { members, loading, error, reload } = useMembers();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -101,7 +101,8 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
       <p className="text-xs text-muted-foreground">
         {members.length} {members.length === 1 ? "person" : "people"} · {fingerprintCount}{" "}
         {fingerprintCount === 1 ? "fingerprint" : "fingerprints"}
-        {!doorOnline && " · Door offline: changes reach it when it reconnects, fingerprints need it online"}
+        {doors.some((door) => !door.online) &&
+          " · Offline doors pick up changes when they reconnect; adding a fingerprint needs that door online"}
       </p>
 
       {notice && (
@@ -129,6 +130,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
             <MemberCard
               key={member.id}
               member={member}
+              doors={doors}
               busy={busyId === member.id}
               onToggleEnabled={(enabled) =>
                 void runForMember(
@@ -137,7 +139,18 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
                   `${member.name} ${enabled ? "enabled" : "disabled"}`,
                 )
               }
-              onAddFingerprint={() => setDialog({ kind: "enroll", member })}
+              onToggleDoor={(door, allowed) =>
+                void runForMember(
+                  member,
+                  () =>
+                    setMemberDoors(
+                      member.id,
+                      allowed ? [...member.doorIds, door.id] : member.doorIds.filter((id) => id !== door.id),
+                    ),
+                  allowed ? `${member.name} can open ${door.name}` : `${member.name} can no longer open ${door.name}`,
+                )
+              }
+              onAddFingerprint={(door) => setDialog({ kind: "enroll", member, door })}
               onDeleteFingerprint={(fingerprint) => setDialog({ kind: "delete-fingerprint", member, fingerprint })}
               onSetUpPhone={() => setDialog({ kind: "phone-invite", member })}
               onDeletePhone={(phone) => setDialog({ kind: "delete-phone", member, phone })}
@@ -161,7 +174,7 @@ export function PeopleTab({ doorOnline }: { doorOnline: boolean }) {
       {dialog?.kind === "enroll" && (
         <EnrollFingerprintDialog
           member={dialog.member}
-          doorOnline={doorOnline}
+          door={doors.find((door) => door.id === dialog.door.id) ?? dialog.door}
           onClose={() => {
             setDialog(null);
             void reload();

@@ -29,6 +29,7 @@ public class DeviceCommandService(
     private static readonly TimeSpan DeleteResendAfter = TimeSpan.FromSeconds(60);
 
     public async Task<DeviceCommand> QueueUnlockAsync(
+        Guid doorId,
         Member? member,
         AccessMethod method,
         CancellationToken cancellationToken)
@@ -36,6 +37,7 @@ public class DeviceCommandService(
         var command = new DeviceCommand
         {
             Id = Guid.NewGuid(),
+            DoorId = doorId,
             Type = CommandType.Unlock,
             MemberId = member?.Id,
             Method = method,
@@ -77,11 +79,12 @@ public class DeviceCommandService(
         return ServiceResult<DeviceCommand>.Ok(command);
     }
 
-    public DeviceCommand AddDeleteFingerprint(int slot, string createdBy)
+    public DeviceCommand AddDeleteFingerprint(Guid doorId, int slot, string createdBy)
     {
         var command = new DeviceCommand
         {
             Id = Guid.NewGuid(),
+            DoorId = doorId,
             Type = CommandType.DeleteFingerprint,
             Slot = slot,
             CreatedBy = createdBy,
@@ -90,14 +93,16 @@ public class DeviceCommandService(
         return command;
     }
 
-    public async Task<IReadOnlyList<DeviceCommand>> TakePendingForDeviceAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DeviceCommand>> TakePendingForDeviceAsync(
+        Guid doorId,
+        CancellationToken cancellationToken)
     {
         await ExpireStaleAsync(cancellationToken);
 
         // Oldest first: a delete queued before an enrollment into the same
         // slot must run first, or it would wipe the new template.
         var pending = await dbContext.DeviceCommands
-            .Where(c => c.Status == CommandStatus.Pending)
+            .Where(c => c.DoorId == doorId && c.Status == CommandStatus.Pending)
             .OrderBy(c => c.CreatedAt)
             .Take(MaxCommandsPerHeartbeat)
             .ToListAsync(cancellationToken);
@@ -119,11 +124,13 @@ public class DeviceCommandService(
     }
 
     public async Task<ServiceResult<DeviceCommand>> ApplyDeviceUpdateAsync(
+        Guid doorId,
         Guid id,
         DeviceCommandUpdate update,
         CancellationToken cancellationToken)
     {
-        var command = await dbContext.DeviceCommands.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        // A door may only report on its own commands.
+        var command = await dbContext.DeviceCommands.FirstOrDefaultAsync(c => c.Id == id && c.DoorId == doorId, cancellationToken);
         if (command is null)
         {
             return ServiceResult<DeviceCommand>.NotFound("Command not found.");
@@ -136,9 +143,9 @@ public class DeviceCommandService(
             if (command.Type == CommandType.EnrollFingerprint
                 && update.Status == CommandStatus.Succeeded
                 && command.Slot is int orphanSlot
-                && !await IsSlotInUseAsync(orphanSlot, command.Id, cancellationToken))
+                && !await IsSlotInUseAsync(command.DoorId, orphanSlot, command.Id, cancellationToken))
             {
-                AddDeleteFingerprint(orphanSlot, SystemUser);
+                AddDeleteFingerprint(command.DoorId, orphanSlot, SystemUser);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
@@ -184,6 +191,7 @@ public class DeviceCommandService(
                 var unlockedBy = command.MemberId is Guid unlockMemberId
                     ? await dbContext.Members.AsNoTracking().FirstOrDefaultAsync(m => m.Id == unlockMemberId, cancellationToken)
                     : null;
+                var unlockedDoor = await dbContext.Doors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == command.DoorId, cancellationToken);
                 dbContext.AccessEvents.Add(new AccessEvent
                 {
                     Id = Guid.NewGuid(),
@@ -191,6 +199,8 @@ public class DeviceCommandService(
                     Method = command.Method ?? AccessMethod.Remote,
                     MemberId = unlockedBy?.Id,
                     MemberName = unlockedBy?.Name,
+                    DoorId = command.DoorId,
+                    DoorName = unlockedDoor?.Name,
                     OccurredAt = now,
                 });
                 break;
@@ -203,11 +213,13 @@ public class DeviceCommandService(
                 if (member is null)
                 {
                     // Member was deleted while they were enrolling.
-                    AddDeleteFingerprint(slot, SystemUser);
+                    AddDeleteFingerprint(command.DoorId, slot, SystemUser);
                     break;
                 }
 
-                var existing = await dbContext.Fingerprints.FirstOrDefaultAsync(f => f.Slot == slot, cancellationToken);
+                var existing = await dbContext.Fingerprints.FirstOrDefaultAsync(
+                    f => f.DoorId == command.DoorId && f.Slot == slot,
+                    cancellationToken);
                 if (existing is not null)
                 {
                     logger.LogWarning("Enrollment into slot {Slot} replaced an existing fingerprint record", slot);
@@ -218,6 +230,7 @@ public class DeviceCommandService(
                 {
                     Id = Guid.NewGuid(),
                     MemberId = member.Id,
+                    DoorId = command.DoorId,
                     Slot = slot,
                     Label = command.Label ?? "Finger",
                     EnrolledAt = now,
@@ -226,15 +239,16 @@ public class DeviceCommandService(
         }
     }
 
-    private async Task<bool> IsSlotInUseAsync(int slot, Guid exceptCommandId, CancellationToken cancellationToken)
+    private async Task<bool> IsSlotInUseAsync(Guid doorId, int slot, Guid exceptCommandId, CancellationToken cancellationToken)
     {
-        if (await dbContext.Fingerprints.AnyAsync(f => f.Slot == slot, cancellationToken))
+        if (await dbContext.Fingerprints.AnyAsync(f => f.DoorId == doorId && f.Slot == slot, cancellationToken))
         {
             return true;
         }
 
         return await dbContext.DeviceCommands.AnyAsync(
             c => c.Id != exceptCommandId
+                 && c.DoorId == doorId
                  && c.Type == CommandType.EnrollFingerprint
                  && c.Slot == slot
                  && (c.Status == CommandStatus.Pending

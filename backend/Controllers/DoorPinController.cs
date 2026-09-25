@@ -4,25 +4,41 @@ using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Controllers;
 
-// The one door PIN everyone uses. Admin only.
+// Each door's PIN (one for everyone at that door). Admin only.
 [ApiController]
-[Route("api/door-pin")]
-public class DoorPinController(IDoorPinService doorPinService) : ControllerBase
+[Route("api/doors/{doorId:guid}/pin")]
+public class DoorPinController(IDoorPinService doorPinService, IDoorStatusStore doorStatusStore) : ControllerBase
 {
-    [HttpGet]
-    public async Task<ActionResult<DoorPinResponse>> GetAsync(CancellationToken cancellationToken) =>
-        Ok(DoorPinResponse.From(await doorPinService.GetAsync(cancellationToken)));
-
     [HttpPut]
-    public async Task<ActionResult<DoorPinResponse>> SetAsync(
+    public async Task<ActionResult<DoorResponse>> SetAsync(
+        Guid doorId,
         [FromBody] SetDoorPinRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await doorPinService.SetAsync(request.Pin, cancellationToken);
-        return this.ToActionResult(result, settings => Ok(DoorPinResponse.From(settings)));
+        var result = await doorPinService.SetAsync(doorId, request.Pin, cancellationToken);
+        if (result.Status != ServiceStatus.Ok)
+        {
+            return this.ToActionResult(result, _ => Ok());
+        }
+
+        return Ok(DoorResponse.From(
+            result.Value!,
+            await doorStatusStore.GetAsync(doorId),
+            await doorStatusStore.IsOnlineAsync(doorId)));
     }
 
     [HttpDelete]
-    public async Task<ActionResult<DoorPinResponse>> ClearAsync(CancellationToken cancellationToken) =>
-        Ok(DoorPinResponse.From(await doorPinService.ClearAsync(cancellationToken)));
+    public async Task<ActionResult<DoorResponse>> ClearAsync(Guid doorId, CancellationToken cancellationToken)
+    {
+        var result = await doorPinService.ClearAsync(doorId, cancellationToken);
+        if (result.Status != ServiceStatus.Ok)
+        {
+            return this.ToActionResult(result, _ => Ok());
+        }
+
+        return Ok(DoorResponse.From(
+            result.Value!,
+            await doorStatusStore.GetAsync(doorId),
+            await doorStatusStore.IsOnlineAsync(doorId)));
+    }
 }

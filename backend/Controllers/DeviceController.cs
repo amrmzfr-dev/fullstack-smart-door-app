@@ -7,9 +7,9 @@ using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Controllers;
 
-// Endpoints called by the door controller (ESP32) itself, not the web app.
-// REST only — the door polls /heartbeat every couple of seconds and gets any
-// waiting commands back in the reply.
+// Endpoints called by door controllers (ESP32s) themselves, not the web app.
+// The X-Device-Key says which door is calling; everything here is scoped to
+// that door. Over MQTT the heartbeat isn't used — it's the fallback link.
 [ApiController]
 [Route("api/device")]
 [AllowAnonymous]
@@ -25,7 +25,8 @@ public class DeviceController(
         [FromBody] HeartbeatRequest request,
         CancellationToken cancellationToken)
     {
-        await doorStatusStore.SaveAsync(new DoorStatusSnapshot(
+        var door = DeviceKeyAttribute.GetDoor(HttpContext);
+        await doorStatusStore.SaveAsync(door.Id, new DoorStatusSnapshot(
             request.DoorOpen,
             request.Locked,
             request.FingerprintReady,
@@ -36,8 +37,8 @@ public class DeviceController(
             request.UptimeMs,
             DateTimeOffset.UtcNow));
 
-        var accessList = await accessListService.BuildAsync(cancellationToken);
-        var commands = await commandService.TakePendingForDeviceAsync(cancellationToken);
+        var accessList = await accessListService.BuildAsync(door.Id, cancellationToken);
+        var commands = await commandService.TakePendingForDeviceAsync(door.Id, cancellationToken);
 
         return Ok(new HeartbeatResponse(
             accessList.Version,
@@ -46,14 +47,14 @@ public class DeviceController(
 
     [HttpGet("access-list")]
     public async Task<ActionResult<AccessList>> GetAccessListAsync(CancellationToken cancellationToken) =>
-        Ok(await accessListService.BuildAsync(cancellationToken));
+        Ok(await accessListService.BuildAsync(DeviceKeyAttribute.GetDoor(HttpContext).Id, cancellationToken));
 
     [HttpPost("events")]
     public async Task<ActionResult> PostEventsAsync(
         [FromBody] DeviceEventBatch batch,
         CancellationToken cancellationToken)
     {
-        await accessEventService.RecordDeviceEventsAsync(batch.Events, cancellationToken);
+        await accessEventService.RecordDeviceEventsAsync(DeviceKeyAttribute.GetDoor(HttpContext), batch.Events, cancellationToken);
         return NoContent();
     }
 
@@ -63,7 +64,11 @@ public class DeviceController(
         [FromBody] DeviceCommandUpdate update,
         CancellationToken cancellationToken)
     {
-        var result = await commandService.ApplyDeviceUpdateAsync(id, update, cancellationToken);
+        var result = await commandService.ApplyDeviceUpdateAsync(
+            DeviceKeyAttribute.GetDoor(HttpContext).Id,
+            id,
+            update,
+            cancellationToken);
         return this.ToActionResult(result, _ => NoContent());
     }
 }

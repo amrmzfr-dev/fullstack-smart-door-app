@@ -8,7 +8,7 @@ import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
 import { errorMessage } from "@/lib/api";
 import { cancelCommand, startEnrollment } from "@/lib/door";
 import { cn } from "@/lib/utils";
-import type { EnrollStep, Member } from "@/types";
+import type { Door, EnrollStep, Member } from "@/types";
 
 const LABEL_PRESETS = ["Right thumb", "Left thumb", "Right index", "Left index"];
 
@@ -24,11 +24,13 @@ const WAITING_FOR_FINGER: ReadonlyArray<string> = ["place_finger", "place_again"
 
 interface EnrollFingerprintDialogProps {
   member: Member;
-  doorOnline: boolean;
+  // Enrolled on this door's own sensor, so it only works on this door.
+  door: Door;
   onClose: () => void;
 }
 
-export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollFingerprintDialogProps) {
+export function EnrollFingerprintDialog({ member, door, onClose }: EnrollFingerprintDialogProps) {
+  const doorOnline = door.online;
   const [label, setLabel] = useState(LABEL_PRESETS[0]);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollF
     setStarting(true);
     setStartError(null);
     try {
-      track(await startEnrollment(member.id, label.trim()));
+      track(await startEnrollment(member.id, door.id, label.trim()));
     } catch (err) {
       setStartError(errorMessage(err, "Couldn't start enrollment. Try again."));
     } finally {
@@ -60,7 +62,11 @@ export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollF
   // ---- Pick a label ----
   if (command === null) {
     return (
-      <Modal title={`Add fingerprint for ${member.name}`} subtitle="Stand at the door before you start" onClose={onClose}>
+      <Modal
+        title={`Add fingerprint for ${member.name}`}
+        subtitle={`On the ${door.name} sensor — stand at that door before you start`}
+        onClose={onClose}
+      >
         <div className="space-y-4">
           <div className="space-y-2">
             <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
@@ -94,7 +100,7 @@ export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollF
 
           {!doorOnline && (
             <p className="rounded-[12px] bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              The door controller is offline. Enrollment needs it online.
+              {door.name} is offline. Enrollment needs its controller online.
             </p>
           )}
           {startError && <p className="text-xs text-destructive">{startError}</p>}
@@ -131,7 +137,7 @@ export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollF
           : (STEPS[stepIndex]?.title ?? "Working…");
 
   const detail = succeeded
-    ? `${label} can now open the door.`
+    ? `${label} can now open ${door.name}.`
     : failed
       ? (command.message ?? "Something went wrong.")
       : waiting
@@ -139,7 +145,7 @@ export function EnrollFingerprintDialog({ member, doorOnline, onClose }: EnrollF
         : (STEPS[stepIndex]?.hint ?? "");
 
   return (
-    <Modal title={`${label} · ${member.name}`} onClose={() => void cancel()}>
+    <Modal title={`${label} · ${member.name}`} subtitle={door.name} onClose={() => void cancel()}>
       <div className="space-y-5">
         <div className="flex flex-col items-center gap-3 pt-2 text-center">
           <div className="relative flex size-28 items-center justify-center">

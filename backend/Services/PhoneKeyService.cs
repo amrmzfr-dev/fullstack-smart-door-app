@@ -12,7 +12,7 @@ public class PhoneKeyService(
     AppDbContext dbContext,
     IFido2 fido2,
     IConnectionMultiplexer redis,
-    IDoorAccessService doorAccessService,
+    IDoorStatusStore doorStatusStore,
     ILogger<PhoneKeyService> logger) : IPhoneKeyService
 {
     private const int MaxLabelLength = 64;
@@ -136,11 +136,12 @@ public class PhoneKeyService(
         return ServiceResult<PhoneKey>.Ok(key);
     }
 
-    public async Task<ServiceResult<WebAuthnChallenge>> StartUnlockAsync(CancellationToken cancellationToken)
+    public async Task<ServiceResult<WebAuthnChallenge>> StartUnlockAsync(Guid doorId, CancellationToken cancellationToken)
     {
-        if (!await doorAccessService.IsDoorOnlineAsync())
+        // Checked first so nobody scans a finger for a door that can't open.
+        if (!await doorStatusStore.IsOnlineAsync(doorId))
         {
-            return ServiceResult<WebAuthnChallenge>.Conflict("The door is offline right now.");
+            return ServiceResult<WebAuthnChallenge>.Conflict("This door is offline right now.");
         }
 
         // No allow-list: the phone offers whichever of its passkeys is ours,

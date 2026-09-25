@@ -1,40 +1,36 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using SmartDoor.Api.Models;
+using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Filters;
 
-// Guards the door-controller endpoints with a shared key (config
-// "Device:ApiKey", sent by the firmware as the X-Device-Key header) instead of
-// a user login. Pair with [AllowAnonymous] so the JWT fallback policy doesn't
-// reject the request first.
+// Guards the door-controller endpoints with the door's own key (the firmware
+// sends its DEVICE_API_KEY as the X-Device-Key header) instead of a user
+// login. The key also says WHICH door is calling — read it with
+// HttpContext.GetDoor(). Pair with [AllowAnonymous] so the JWT fallback
+// policy doesn't reject the request first.
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
-public sealed class DeviceKeyAttribute : Attribute, IAuthorizationFilter
+public sealed class DeviceKeyAttribute : Attribute, IAsyncAuthorizationFilter
 {
     public const string HeaderName = "X-Device-Key";
+    private const string DoorItemKey = "SmartDoor.Door";
 
-    public void OnAuthorization(AuthorizationFilterContext context)
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
-        var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-        var expected = configuration["Device:ApiKey"];
-        if (string.IsNullOrEmpty(expected))
+        var doors = context.HttpContext.RequestServices.GetRequiredService<IDoorService>();
+        var provided = context.HttpContext.Request.Headers[HeaderName].ToString();
+        var door = await doors.FindByKeyAsync(provided, context.HttpContext.RequestAborted);
+        if (door is null)
         {
-            context.Result = new ObjectResult("Device:ApiKey is not configured.")
-            {
-                StatusCode = StatusCodes.Status503ServiceUnavailable,
-            };
+            context.Result = new UnauthorizedResult();
             return;
         }
 
-        var provided = context.HttpContext.Request.Headers[HeaderName].ToString();
-        var matches = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expected),
-            Encoding.UTF8.GetBytes(provided));
-
-        if (!matches)
-        {
-            context.Result = new UnauthorizedResult();
-        }
+        context.HttpContext.Items[DoorItemKey] = door;
     }
+
+    public static Door GetDoor(HttpContext httpContext) =>
+        httpContext.Items[DoorItemKey] as Door
+        ?? throw new InvalidOperationException("No door on this request — is [DeviceKey] missing?");
 }

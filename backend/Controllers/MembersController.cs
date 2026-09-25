@@ -34,6 +34,17 @@ public class MembersController(IMemberService memberService) : ControllerBase
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
 
+    // Which doors this person may open (replaces the whole set).
+    [HttpPut("{id:guid}/doors")]
+    public async Task<ActionResult<MemberResponse>> SetDoorsAsync(
+        Guid id,
+        [FromBody] SetMemberDoorsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await memberService.SetDoorsAsync(id, request.DoorIds, cancellationToken);
+        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {

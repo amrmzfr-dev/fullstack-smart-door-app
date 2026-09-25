@@ -8,6 +8,8 @@ public sealed record AccessEventResponse(
     AccessMethod Method,
     Guid? MemberId,
     string? MemberName,
+    Guid? DoorId,
+    string? DoorName,
     string? Username,
     int? FingerprintSlot,
     DateTimeOffset OccurredAt)
@@ -19,6 +21,8 @@ public sealed record AccessEventResponse(
             accessEvent.Method,
             accessEvent.MemberId,
             accessEvent.MemberName,
+            accessEvent.DoorId,
+            accessEvent.DoorName,
             accessEvent.Username,
             accessEvent.FingerprintSlot,
             accessEvent.OccurredAt);
