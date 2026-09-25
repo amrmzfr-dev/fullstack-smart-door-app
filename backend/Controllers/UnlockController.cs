@@ -15,11 +15,19 @@ namespace SmartDoor.Api.Controllers;
 [AllowAnonymous]
 public class UnlockController(
     IDoorAccessService doorAccessService,
+    IDoorStatusStore doorStatusStore,
     IPhoneKeyService phoneKeyService) : ControllerBase
 {
     [HttpGet("status")]
-    public async Task<ActionResult<UnlockStatusResponse>> GetStatusAsync() =>
-        Ok(new UnlockStatusResponse(await doorAccessService.IsDoorOnlineAsync()));
+    public async Task<ActionResult<UnlockStatusResponse>> GetStatusAsync()
+    {
+        var snapshot = await doorStatusStore.GetAsync();
+        var online = snapshot is not null
+                     && DateTimeOffset.UtcNow - snapshot.LastSeenAt <= RedisDoorStatusStore.OnlineWindow;
+        return Ok(online
+            ? new UnlockStatusResponse(true, snapshot!.DoorOpen, snapshot.Locked)
+            : new UnlockStatusResponse(false, null, null));
+    }
 
     [HttpPost("pin")]
     [EnableRateLimiting(RateLimits.PinAttempts)]

@@ -17,9 +17,11 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "1.1.0";
+constexpr char FIRMWARE_VERSION[] = "1.2.0";
 
-constexpr uint32_t HEARTBEAT_INTERVAL_MS = 2000;   // also how often commands are picked up
+// Also how often app unlocks are picked up, so kept short. A door open/close
+// or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
+constexpr uint32_t HEARTBEAT_INTERVAL_MS = 500;
 constexpr uint32_t WIFI_RETRY_INTERVAL_MS = 10000;
 constexpr uint32_t EVENT_RETRY_INTERVAL_MS = 3000;
 constexpr uint32_t REPORT_RETRY_INTERVAL_MS = 1000;
@@ -62,6 +64,9 @@ uint32_t lastWifiAttemptAt = 0;
 
 bool backendReachable = false;
 uint32_t lastHeartbeatAt = 0;
+// Door state in the last heartbeat sent, to spot changes worth sending now.
+bool sentDoorOpen = false;
+bool sentLocked = true;
 bool accessListStale = false;
 
 DoorEvent pendingEvents[EVENTS_PER_POST];
@@ -141,6 +146,9 @@ WiFiClient& transport() {
 // failure. Blocks this task only (up to HTTP_TIMEOUT_MS).
 int sendRequest(const char* method, const String& path, const String& body, String* response) {
   HTTPClient http;
+  // Keep the TLS connection open between requests — a fresh handshake every
+  // heartbeat would add hundreds of ms.
+  http.setReuse(true);
   http.setConnectTimeout(HTTP_TIMEOUT_MS);
   http.setTimeout(HTTP_TIMEOUT_MS);
 
@@ -208,11 +216,20 @@ bool ensureWifi(uint32_t now) {
 // Heartbeat + commands
 // ============================================================================
 
+bool statusChangedSinceHeartbeat() {
+  portENTER_CRITICAL(&statusMux);
+  const bool changed = latestStatus.doorOpen != sentDoorOpen || latestStatus.locked != sentLocked;
+  portEXIT_CRITICAL(&statusMux);
+  return changed;
+}
+
 void sendHeartbeat() {
   DoorStatus status;
   portENTER_CRITICAL(&statusMux);
   status = latestStatus;
   portEXIT_CRITICAL(&statusMux);
+  sentDoorOpen = status.doorOpen;
+  sentLocked = status.locked;
 
   JsonDocument doc;
   doc["doorOpen"] = status.doorOpen;
@@ -409,7 +426,7 @@ void netTask(void*) {
     if (ensureWifi(now)) {
       flushReports(now);
       flushEvents(now);
-      if (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+      if (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS || statusChangedSinceHeartbeat()) {
         lastHeartbeatAt = now;
         sendHeartbeat();
       }

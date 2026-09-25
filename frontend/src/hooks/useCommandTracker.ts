@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchCommand } from "@/lib/door";
 import type { CommandStatus, DeviceCommand } from "@/types";
 
-const POLL_MS = 800;
+const POLL_MS = 250;
 const FINISHED: ReadonlyArray<CommandStatus> = ["succeeded", "failed", "expired", "cancelled"];
 
 export function isFinished(status: CommandStatus): boolean {

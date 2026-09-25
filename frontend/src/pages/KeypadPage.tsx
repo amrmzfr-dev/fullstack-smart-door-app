@@ -13,6 +13,7 @@ import type { Theme } from "@/lib/theme";
 import { fetchUnlock, fetchUnlockStatus, unlockWithPhone, unlockWithPin } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
 import { isCancelled, isPhoneUnlockSupported } from "@/lib/webauthn";
+import type { UnlockStatus } from "@/types";
 
 // Must match PinRules on the backend.
 const PIN_MIN_LENGTH = 4;
@@ -21,7 +22,8 @@ const PIN_MAX_LENGTH = 4;
 const RESULT_MS = 5000;
 const NOTICE_MS = 5000;
 const LOCKOUT_MS = 60_000;
-const STATUS_POLL_MS = 3000;
+// Fast enough that the lock picture follows the real door within a second.
+const STATUS_POLL_MS = 1000;
 
 // Test PINs for trying the screen without a door. Dev builds only, and they
 // never reach the server, so they can't open anything.
@@ -55,22 +57,28 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   // Last attempt was refused (wrong PIN / fingerprint) — shows DENIED.
   const [denied, setDenied] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const [online, setOnline] = useState<boolean | null>(null);
+  const [door, setDoor] = useState<UnlockStatus | null>(null);
   const { command, track, reset } = useCommandTracker(fetchUnlock);
   const now = useNow(1000);
   const phoneSupported = isPhoneUnlockSupported();
 
   const refreshStatus = useCallback(async () => {
     try {
-      setOnline((await fetchUnlockStatus()).online);
+      setDoor(await fetchUnlockStatus());
     } catch {
-      setOnline(false);
+      setDoor({ online: false, doorOpen: null, locked: null });
     }
   }, []);
   usePolling(refreshStatus, STATUS_POLL_MS);
 
+  const online = door === null ? null : door.online;
+  // The real door, as last reported: open (contact) or unlocked (relay).
+  const doorIsOpen = door?.doorOpen === true || door?.locked === false;
+
   const opening = command !== null && !isFinished(command.status);
+  // "OPEN" result from an unlock, or the door is open/unlocked right now.
   const opened = command?.status === "succeeded";
+  const showOpen = opened || (doorIsOpen && command === null);
   const doorFailed = command !== null && isFinished(command.status) && !opened;
   const locked = lockedUntil !== null && now < lockedUntil;
   const lockSeconds = lockedUntil !== null && locked ? Math.ceil((lockedUntil - now) / 1000) : 0;
@@ -215,7 +223,15 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
               online === null ? "bg-muted-foreground" : online ? "bg-success" : "bg-destructive",
             )}
           />
-          {online === null ? "…" : online ? "Door online" : "Door offline"}
+          {online === null
+            ? "…"
+            : !online
+              ? "Door offline"
+              : door?.doorOpen
+                ? "Door open"
+                : door?.locked === false
+                  ? "Unlocked"
+                  : "Locked"}
         </span>
       </div>
 
@@ -282,7 +298,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
 
       <main className="flex flex-1 flex-col items-center justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <VaultLock
-          state={opened ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
+          state={showOpen ? "open" : errorShown ? "error" : busy || opening ? "working" : "idle"}
           digits={pin.length}
           shakeKey={shakeKey}
         />

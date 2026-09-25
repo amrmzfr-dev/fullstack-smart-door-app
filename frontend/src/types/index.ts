@@ -101,8 +101,11 @@ export interface AccessEvent {
 
 // ---- Public keypad app ----
 
+// doorOpen / locked are null while the door is offline.
 export interface UnlockStatus {
   online: boolean;
+  doorOpen: boolean | null;
+  locked: boolean | null;
 }
 
 // Deliberately no name: the keypad app never says who opened the door.

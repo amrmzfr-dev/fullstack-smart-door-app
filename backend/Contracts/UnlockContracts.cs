@@ -7,7 +7,9 @@ namespace SmartDoor.Api.Contracts;
 
 public sealed record PinUnlockRequest(string Pin);
 
-public sealed record UnlockStatusResponse(bool Online);
+// Door state for the lock picture. DoorOpen / Locked are null while the door
+// is offline (its last report may be stale).
+public sealed record UnlockStatusResponse(bool Online, bool? DoorOpen, bool? Locked);
 
 // Only what the keypad needs to show "opening… / door open / didn't respond".
 // Deliberately no member name — the app never says who someone is.
