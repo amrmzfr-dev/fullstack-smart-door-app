@@ -1,0 +1,15 @@
+@host = http://localhost:5125
+@deviceKey = local-dev-device-key
+
+### Login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+### Fake door heartbeat (what the ESP32 sends every 2s)
+POST {{host}}/api/device/heartbeat
+Content-Type: application/json
+X-Device-Key: {{deviceKey}}
+
+{ "doorOpen": false, "locked": true, "fingerprintReady": true, "templateCount": 0, "firmwareVersion": "1.0.0", "ipAddress": "192.168.1.50", "rssi": -60, "uptimeMs": 12345 }

@@ -1,0 +1,478 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Archivo", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* Same Gatekeep palette as the Gate Sensor app (accent #FF5B41 on ink
+   #0C0C0C), exposed through the shadcn tokens so every component just uses
+   bg-background / bg-card / text-primary etc. Light mode is the same accent
+   on the palette's cream (#F1EDE2) instead of ink. */
+:root {
+  --radius: 0.85rem;
+  --background: #f4f1e8;
+  --foreground: #0c0c0c;
+  --card: #ffffff;
+  --card-foreground: #0c0c0c;
+  --popover: #ffffff;
+  --popover-foreground: #0c0c0c;
+  --primary: #ff5b41;
+  --primary-foreground: #0c0c0c;
+  --secondary: #ebe7dc;
+  --secondary-foreground: #0c0c0c;
+  --muted: #ebe7dc;
+  --muted-foreground: #6b6a66;
+  --accent: #ffe4dd;
+  --accent-foreground: #c2371f;
+  --destructive: #e0432b;
+  --success: #3f8f2a;
+  --warning: #b8860b;
+  --border: rgba(12, 12, 12, 0.1);
+  --input: rgba(12, 12, 12, 0.12);
+  --ring: #ff5b41;
+
+  /* 3D keypad (public unlock app) */
+  --key-face: #ffffff;
+  --key-side: #b9b09a;
+  --key-highlight: rgba(255, 255, 255, 0.95);
+  --key-drop: rgba(12, 12, 12, 0.18);
+  --screen: #d9dccb;
+  --screen-inset: rgba(12, 12, 12, 0.22);
+
+  /* Vault lock metal */
+  --vault-face: #c9ccd1;
+  --vault-side: #7d828a;
+  --vault-shine: rgba(255, 255, 255, 0.75);
+  --vault-shade: rgba(12, 12, 12, 0.14);
+}
+
+.dark {
+  --background: #0c0c0c;
+  --foreground: #ffffff;
+  --card: #161616;
+  --card-foreground: #ffffff;
+  --popover: #161616;
+  --popover-foreground: #ffffff;
+  --primary: #ff5b41;
+  --primary-foreground: #0c0c0c;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ffffff;
+  --muted: #1a1a1a;
+  --muted-foreground: #9a9a9a;
+  --accent: #2a1712;
+  --accent-foreground: #ff8a73;
+  --destructive: #ff5b41;
+  --success: #a8e063;
+  --warning: #f4c33f;
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.09);
+  --ring: #ff5b41;
+
+  /* Face and edge are both lighter than the page so the edge shows up,
+     the same way the orange Enter key's darker-orange edge does. */
+  --key-face: #353535;
+  --key-side: #1c1c1c;
+  --key-highlight: rgba(255, 255, 255, 0.16);
+  --key-drop: rgba(0, 0, 0, 0.6);
+  --screen: #070807;
+  --screen-inset: rgba(0, 0, 0, 0.9);
+
+  --vault-face: #52565c;
+  --vault-side: #1f2124;
+  --vault-shine: rgba(255, 255, 255, 0.2);
+  --vault-shade: rgba(0, 0, 0, 0.35);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Archivo", system-ui, sans-serif;
+  }
+}
+
+/* Hide scrollbars everywhere (still scrollable). */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Pulse ring around the fingerprint while the door waits for a finger, and
+   behind the unlock button while the signal is in flight. */
+@keyframes gcPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.animate-gc-pulse {
+  animation: gcPulse 1.4s ease-out infinite;
+}
+
+/* Wrong-PIN shake on the on-screen keypad display. */
+@keyframes pinShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-pin-shake {
+  animation: pinShake 0.35s ease-in-out;
+}
+
+/* ---- 3D keypad (public unlock app) ----
+   No frame: the keys themselves lean back in perspective and follow the
+   mouse a little. Each key is a raised block standing off the page: a solid
+   "side" shadow under the face gives it height, and pressing pushes the face
+   down onto it. Solid colours only. */
+.pad-stage {
+  perspective: 1000px;
+}
+
+.pad-3d {
+  transform-style: preserve-3d;
+  transform: rotateX(calc(18deg + var(--tilt-x, 0deg))) rotateY(var(--tilt-y, 0deg));
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pad-screen {
+  transform: translateZ(10px);
+  background: var(--screen);
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 0.3s;
+  box-shadow:
+    inset 0 3px 10px var(--screen-inset),
+    0 1px 0 var(--key-highlight);
+}
+
+.pad-screen[data-tone="success"] {
+  outline-color: var(--success);
+}
+
+.pad-screen[data-tone="error"] {
+  outline-color: var(--destructive);
+}
+
+.key3d {
+  --depth: 8px;
+  transform: translateZ(22px);
+  background: var(--key-face);
+  box-shadow:
+    inset 0 1px 0 var(--key-highlight),
+    0 var(--depth) 0 var(--key-side),
+    0 calc(var(--depth) + 8px) 16px -4px var(--key-drop);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.key3d[data-down="true"] {
+  transform: translateZ(8px) translateY(calc(var(--depth) - 1px));
+  box-shadow:
+    inset 0 1px 0 var(--key-highlight),
+    0 1px 0 var(--key-side),
+    0 2px 4px var(--key-drop);
+}
+
+.key3d:disabled {
+  opacity: 0.45;
+}
+
+.key3d-primary {
+  --key-face: var(--primary);
+  --key-side: color-mix(in oklch, var(--primary), black 42%);
+  --key-highlight: rgba(255, 255, 255, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad-3d,
+  .pad-screen,
+  .key3d {
+    transition: none;
+  }
+}
+
+/* ---- Vault lock above the keypad ----
+   Built from real boxes (not a flat drawing): the gate leans back in
+   perspective, and every part has a solid side edge for thickness plus inset
+   shine/shade so the bars read as round metal. Solid colours only.
+   Open plays in order: dial turns straight, then it splits in two and
+   both halves slide apart with the bars. */
+.vault-stage {
+  perspective: 900px;
+}
+
+.vault {
+  --metal-face: var(--vault-face);
+  --metal-side: var(--vault-side);
+  transform: rotateX(24deg);
+  transform-origin: 50% 100%;
+  transition: filter 0.3s;
+}
+
+.vault[data-state="open"] {
+  --metal-face: var(--success);
+  --metal-side: color-mix(in oklch, var(--success), black 48%);
+}
+
+.vault[data-state="error"] {
+  --metal-face: var(--destructive);
+  --metal-side: color-mix(in oklch, var(--destructive), black 48%);
+}
+
+.vault-plate {
+  background: var(--screen);
+  box-shadow:
+    inset 0 6px 14px var(--screen-inset),
+    inset 0 -1px 0 var(--vault-shine);
+  transition: background-color 0.4s 0.5s;
+}
+
+.vault[data-state="open"] .vault-plate {
+  background: color-mix(in oklch, var(--success), var(--screen) 78%);
+}
+
+.vault-post,
+.vault-bar,
+.vault-knob {
+  background: var(--metal-face);
+  transition:
+    background-color 0.3s,
+    box-shadow 0.3s,
+    transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.vault-post {
+  box-shadow:
+    inset 0 2px 0 var(--vault-shine),
+    inset -5px 0 0 var(--vault-shade),
+    0 10px 0 var(--metal-side),
+    0 20px 22px -8px var(--key-drop);
+}
+
+/* Round bars: bright line on top, dark band underneath, thick edge below. */
+.vault-bar {
+  box-shadow:
+    inset 0 3px 0 var(--vault-shine),
+    inset 0 -7px 0 var(--vault-shade),
+    0 7px 0 var(--metal-side),
+    0 14px 14px -6px var(--key-drop);
+}
+
+/* One side = its two bars + its half of the dial, moved as a single piece
+   so the square stays fixed to the rods. */
+.vault-side {
+  transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.vault[data-state="open"] .vault-side-left {
+  transform: translateX(-26%);
+  transition-delay: 0.35s;
+}
+
+.vault[data-state="open"] .vault-side-right {
+  transform: translateX(26%);
+  transition-delay: 0.35s;
+}
+
+.vault-rivet {
+  background: var(--metal-side);
+  box-shadow: 0 1px 0 var(--vault-shine);
+}
+
+.vault-knob {
+  box-shadow:
+    inset 0 3px 0 var(--vault-shine),
+    inset 0 -6px 0 var(--vault-shade),
+    0 12px 0 var(--metal-side),
+    0 24px 24px -8px var(--key-drop);
+}
+
+.vault-knob-face {
+  transition: transform 0.3s ease-out;
+}
+
+.vault-knob-ring {
+  box-shadow:
+    inset 0 3px 6px var(--vault-shade),
+    0 1px 0 var(--vault-shine);
+}
+
+.vault-spoke {
+  background: var(--metal-side);
+  box-shadow: inset 0 1px 0 var(--vault-shine);
+}
+
+.vault[data-state="working"] .vault-knob-face {
+  animation: vaultSpin 1.1s linear infinite;
+}
+
+/* Each side shows only its half of the dial (shadows still spill out top,
+   bottom and outside). */
+.vault-knob-left {
+  clip-path: inset(-40px 50% -40px -40px);
+}
+
+.vault-knob-right {
+  clip-path: inset(-40px -40px -40px 50%);
+}
+
+@keyframes vaultSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vault-post,
+  .vault-bar,
+  .vault-knob,
+  .vault-side,
+  .vault-knob-face,
+  .vault-plate {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---- Code-breaker tiles on the keypad display ----
+   Raised tiles like the keys; the characters flip over in 3D on every change
+   and have a stacked text-shadow so they look extruded. */
+.scramble-row {
+  perspective: 420px;
+}
+
+.scramble-tile {
+  --depth: 5px;
+  --tile-face: var(--key-face);
+  --tile-side: var(--key-side);
+  background: var(--tile-face);
+  color: var(--foreground);
+  box-shadow:
+    inset 0 1px 0 var(--key-highlight),
+    0 var(--depth) 0 var(--tile-side),
+    0 calc(var(--depth) + 6px) 10px -3px var(--key-drop);
+  text-shadow:
+    0 1px 0 color-mix(in oklch, currentColor, black 45%),
+    0 2px 0 color-mix(in oklch, currentColor, black 55%),
+    0 3px 0 color-mix(in oklch, currentColor, black 65%);
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.scramble-tile[data-tone="success"] {
+  --tile-face: var(--success);
+  --tile-side: color-mix(in oklch, var(--success), black 45%);
+  color: var(--primary-foreground);
+}
+
+.scramble-tile[data-tone="error"] {
+  --tile-face: var(--destructive);
+  --tile-side: color-mix(in oklch, var(--destructive), black 45%);
+  color: var(--primary-foreground);
+}
+
+.scramble-tile[data-locked="true"] {
+  animation: tileLock 0.25s ease-out;
+}
+
+.scramble-glyph {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  animation: tileFlip 0.12s ease-out;
+}
+
+@keyframes tileFlip {
+  from {
+    transform: rotateX(-85deg);
+    opacity: 0.3;
+  }
+  to {
+    transform: rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes tileLock {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-4px) scale(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scramble-tile,
+  .scramble-glyph {
+    animation: none;
+  }
+}

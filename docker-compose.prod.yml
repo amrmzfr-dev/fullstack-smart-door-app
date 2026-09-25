@@ -1,0 +1,75 @@
+# Prod on the VPS (/opt/smart-door-prod). Images are built by GitHub Actions
+# and streamed to the server — see .github/workflows.
+#   utils.czeros.tech      -> nginx -> 127.0.0.1:3008 (frontend)
+#   utils-api.czeros.tech  -> nginx -> 127.0.0.1:8098 (backend, also the door)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smart-door-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartdoor_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-smartdoor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartdoor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+  redis:
+    image: redis:7-alpine
+    container_name: smart-door-redis-prod
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+  backend:
+    image: ghcr.io/amrmzfr-dev/fullstack-smart-door-app-backend:prod
+    container_name: smart-door-backend-prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:8098:8080"
+    networks:
+      - default
+
+  frontend:
+    image: ghcr.io/amrmzfr-dev/fullstack-smart-door-app-frontend:prod
+    container_name: smart-door-frontend-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3008:80"
+    networks:
+      - default
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.48.0.0/16
+          gateway: 172.48.0.1
