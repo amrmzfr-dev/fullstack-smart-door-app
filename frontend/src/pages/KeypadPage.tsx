@@ -23,7 +23,7 @@ const RESULT_MS = 5000;
 const NOTICE_MS = 5000;
 const LOCKOUT_MS = 60_000;
 // Fast enough that the lock picture follows the real door almost at once.
-const STATUS_POLL_MS = 500;
+const STATUS_POLL_MS = 250;
 
 // Test PINs for trying the screen without a door. Dev builds only, and they
 // never reach the server, so they can't open anything.
@@ -63,9 +63,21 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   const now = useNow(1000);
   const phoneSupported = isPhoneUnlockSupported();
 
+  // After an app unlock, the screen shows open straight away (the door just
+  // took the unlock). As soon as the door itself reports unlocked/open, it
+  // "takes over": from then on only the door's report counts, so the screen
+  // relocks the moment the door does — not on a timer.
+  const [handedOffId, setHandedOffId] = useState<string | null>(null);
+  const confirmedIdRef = useRef<string | null>(null);
+
   const refreshStatus = useCallback(async () => {
     try {
-      setDoor(await fetchUnlockStatus());
+      const status = await fetchUnlockStatus();
+      setDoor(status);
+      const confirmedId = confirmedIdRef.current;
+      if (confirmedId !== null && status.online && (status.doorOpen === true || status.locked === false)) {
+        setHandedOffId(confirmedId);
+      }
     } catch {
       setDoor({ online: false, doorOpen: null, locked: null });
     }
@@ -87,7 +99,11 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   // the door confirmed an app unlock, or reports it's unlocked/open (door
   // keypad, fingerprint, exit button). Closing happens together too, once
   // neither says open any more.
-  const isOpen = unlockConfirmed || doorReportsOpen;
+  const isOpen = (unlockConfirmed && handedOffId !== command?.id) || doorReportsOpen;
+
+  useEffect(() => {
+    confirmedIdRef.current = unlockConfirmed && command !== null ? command.id : null;
+  }, [unlockConfirmed, command]);
   const doorFailed = command !== null && isFinished(command.status) && !unlockConfirmed;
   const locked = lockedUntil !== null && now < lockedUntil;
   const lockSeconds = lockedUntil !== null && locked ? Math.ceil((lockedUntil - now) / 1000) : 0;
@@ -144,7 +160,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
       try {
         if (import.meta.env.DEV && (value === DEMO_OPEN_PIN || value === DEMO_FAIL_PIN)) {
           await new Promise((resolve) => window.setTimeout(resolve, DEMO_DELAY_MS));
-          if (value === DEMO_OPEN_PIN) track({ id: "demo", status: "succeeded", message: null });
+          if (value === DEMO_OPEN_PIN) track({ id: `demo-${Date.now()}`, status: "succeeded", message: null });
           else {
             setDenied(true);
             showError("Wrong PIN.");
@@ -193,7 +209,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
       if (import.meta.env.DEV) {
         await new Promise((resolve) => window.setTimeout(resolve, DEMO_DELAY_MS));
         if (heldMs < DEMO_FINGER_HOLD_MS) {
-          track({ id: "demo", status: "succeeded", message: null });
+          track({ id: `demo-${Date.now()}`, status: "succeeded", message: null });
         } else {
           setDenied(true);
           showError("Fingerprint not accepted. Try again.");
