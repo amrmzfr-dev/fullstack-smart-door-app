@@ -17,7 +17,7 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "1.2.0";
+constexpr char FIRMWARE_VERSION[] = "1.2.1";
 
 // Also how often app unlocks are picked up, so kept short. A door open/close
 // or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
@@ -145,9 +145,11 @@ WiFiClient& transport() {
 // Returns the HTTP status code, or a negative HTTPClient error on a transport
 // failure. Blocks this task only (up to HTTP_TIMEOUT_MS).
 int sendRequest(const char* method, const String& path, const String& body, String* response) {
-  HTTPClient http;
-  // Keep the TLS connection open between requests — a fresh handshake every
-  // heartbeat would add hundreds of ms.
+  // One HTTPClient for the whole run (net task only). A local one would close
+  // the TLS connection when it goes out of scope — its destructor stops the
+  // client — so every request paid a ~1s handshake. Kept alive, the
+  // connection is opened once and reused.
+  static HTTPClient http;
   http.setReuse(true);
   http.setConnectTimeout(HTTP_TIMEOUT_MS);
   http.setTimeout(HTTP_TIMEOUT_MS);
@@ -171,6 +173,10 @@ int sendRequest(const char* method, const String& path, const String& body, Stri
     *response = http.getString();
   }
   http.end();
+  if (status < 0) {
+    // Broken connection — drop it so the next request starts a fresh one.
+    transport().stop();
+  }
   return status;
 }
 
