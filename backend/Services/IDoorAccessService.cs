@@ -13,4 +13,11 @@ public interface IDoorAccessService
         AccessMethod method,
         CancellationToken cancellationToken);
     Task<ServiceResult<DeviceCommand>> GetUnlockAsync(Guid id, CancellationToken cancellationToken);
+
+    // Returns as soon as the unlock's status differs from `from` (or after a
+    // few seconds with it unchanged) — lets the app follow the door instantly.
+    Task<ServiceResult<DeviceCommand>> WaitForUnlockChangeAsync(
+        Guid id,
+        CommandStatus from,
+        CancellationToken cancellationToken);
 }

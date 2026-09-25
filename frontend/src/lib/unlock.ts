@@ -6,7 +6,7 @@ import {
   type CreationOptionsJson,
   type RequestOptionsJson,
 } from "@/lib/webauthn";
-import type { PhoneSetupResult, UnlockProgress, UnlockStatus, WebAuthnChallenge } from "@/types";
+import type { CommandStatus, PhoneSetupResult, UnlockProgress, UnlockStatus, WebAuthnChallenge } from "@/types";
 
 // Public keypad app — none of these need a login.
 
@@ -18,8 +18,12 @@ export function unlockWithPin(pin: string): Promise<UnlockProgress> {
   return apiPost<UnlockProgress>("/unlock/pin", { pin });
 }
 
-export function fetchUnlock(id: string): Promise<UnlockProgress> {
-  return apiGet<UnlockProgress>(`/unlock/${id}`);
+// While the unlock is waiting for the door ("pending") or just taken by it
+// ("sent"), the server holds the reply until that changes — so the app hears
+// the moment the door takes the unlock instead of on its next poll.
+export function fetchUnlock(id: string, current?: CommandStatus): Promise<UnlockProgress> {
+  const wait = current === "pending" || current === "sent" ? `?changedFrom=${current}` : "";
+  return apiGet<UnlockProgress>(`/unlock/${id}${wait}`);
 }
 
 // Asks the phone for its fingerprint / face, then sends the signed answer.

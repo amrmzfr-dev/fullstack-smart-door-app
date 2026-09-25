@@ -40,10 +40,18 @@ public class UnlockController(
     }
 
     // Poll after an unlock to learn whether the door actually opened.
+    // With ?changedFrom=pending the reply is held (up to a few seconds) until
+    // the status moves on, so the app hears the moment the door takes the
+    // unlock instead of finding out on its next poll.
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<UnlockProgressResponse>> GetAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<UnlockProgressResponse>> GetAsync(
+        Guid id,
+        [FromQuery] CommandStatus? changedFrom,
+        CancellationToken cancellationToken)
     {
-        var result = await doorAccessService.GetUnlockAsync(id, cancellationToken);
+        var result = changedFrom is CommandStatus status
+            ? await doorAccessService.WaitForUnlockChangeAsync(id, status, cancellationToken)
+            : await doorAccessService.GetUnlockAsync(id, cancellationToken);
         return this.ToActionResult(result, command => Ok(UnlockProgressResponse.From(command)));
     }
 

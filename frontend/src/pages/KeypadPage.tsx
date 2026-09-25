@@ -58,7 +58,8 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   const [denied, setDenied] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [door, setDoor] = useState<UnlockStatus | null>(null);
-  const { command, track, reset } = useCommandTracker(fetchUnlock);
+  // pollMs 0: fetchUnlock waits on the server, so ask again straight away.
+  const { command, track, reset } = useCommandTracker(fetchUnlock, { pollMs: 0 });
   const now = useNow(1000);
   const phoneSupported = isPhoneUnlockSupported();
 
@@ -76,7 +77,10 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
   const doorReportsOpen = door?.online === true && (door.doorOpen === true || door.locked === false);
 
   const opening = command !== null && !isFinished(command.status);
-  const unlockConfirmed = command?.status === "succeeded";
+  // "sent" = the door has just taken the unlock, which is when its relay
+  // fires — so that already counts as open (a later failure shows FAILED).
+  const unlockConfirmed =
+    command?.status === "sent" || command?.status === "in_progress" || command?.status === "succeeded";
 
   // THE single open/closed value. The OPEN tiles, the "Unlocked" label and
   // the vault all read only this, so they always change together — whether
