@@ -1,3 +1,4 @@
+using SmartDoor.Api.Contracts;
 using SmartDoor.Api.Models;
 
 namespace SmartDoor.Api.Services;
@@ -11,6 +12,7 @@ public interface IDoorService
     Task<Door?> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<CreatedDoor>> CreateAsync(string name, CancellationToken cancellationToken);
     Task<ServiceResult<Door>> RenameAsync(Guid id, string name, CancellationToken cancellationToken);
+    Task<ServiceResult<Door>> UpdateScheduleAsync(Guid id, UpdateDoorScheduleRequest request, CancellationToken cancellationToken);
     Task<ServiceResult<CreatedDoor>> ResetKeyAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken);
 

@@ -57,7 +57,12 @@ public sealed record HeartbeatResponse(string AccessListVersion, IReadOnlyList<D
 
 public sealed record AccessListPin(Guid MemberId, string Salt, string Hash);
 
+// Open hours the controller applies itself (it keeps time over NTP). Minutes
+// since local midnight; Days is a bit mask (Monday = bit 0 ... Sunday = bit 6).
+public sealed record AccessSchedule(bool Enabled, int From, int Until, int Days, int UtcOffsetMinutes);
+
 public sealed record AccessList(
     string Version,
     IReadOnlyList<AccessListPin> Pins,
-    IReadOnlyList<int> FingerprintSlots);
+    IReadOnlyList<int> FingerprintSlots,
+    AccessSchedule Schedule);

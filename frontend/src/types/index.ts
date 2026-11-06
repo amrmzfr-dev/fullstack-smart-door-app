@@ -36,6 +36,16 @@ export interface LoginResponse {
   username: string;
 }
 
+// Weekly open hours: the door stays unlocked from..until ("HH:mm", door's
+// local time) on these days (0 = Monday ... 6 = Sunday).
+export interface DoorSchedule {
+  enabled: boolean;
+  from: string;
+  until: string;
+  days: number[];
+  utcOffsetMinutes: number;
+}
+
 // A door (one controller) as the admin sees it. Live state is null while the
 // door is offline or has never connected. Never the PIN or key itself.
 export interface Door {
@@ -53,6 +63,7 @@ export interface Door {
   pinSet: boolean;
   pinUpdatedAt: string | null;
   createdAt: string;
+  schedule: DoorSchedule;
 }
 
 // What goes into a door controller's secrets.h — shown once.

@@ -192,6 +192,8 @@ uint32_t unlockLastTriggeredAt = 0;  // latest trigger (re-triggers extend the p
 bool hasRelocked = false;
 uint32_t lastRelockAt = 0;
 bool waitingForDoorClose = false;  // pulse ended but door still open
+// Open hours (see handleSchedule): the lock is held released, nothing re-locks it.
+bool scheduleHolding = false;
 
 // ---- Inputs ----
 DebouncedInput exitButton = {PIN_EXIT_BUTTON, HIGH, HIGH, 0};
@@ -378,6 +380,9 @@ void triggerUnlock(UnlockSource source, uint32_t now) {
 }
 
 void handleRelay(uint32_t now) {
+  if (scheduleHolding) {
+    return;  // open hours: stays unlocked until they end
+  }
   if (!relayUnlocked || now - unlockLastTriggeredAt < UNLOCK_DURATION_MS) {
     return;
   }
@@ -806,6 +811,39 @@ void exitButtonPressed(uint32_t now) {
   emitEvent(EventType::Granted, EventMethod::ExitButton);
 }
 
+// Open hours from the dashboard (e.g. 07:00-19:00 on weekdays): the lock stays
+// released while they last. When they end, the normal re-lock takes over — right
+// away if the door is shut, or as soon as it closes. Any PIN / fingerprint /
+// phone / exit button then works as usual.
+void handleSchedule(uint32_t now) {
+  static uint32_t lastCheckAt = 0;
+  if (now - lastCheckAt < 1000) {
+    return;
+  }
+  lastCheckAt = now;
+
+  const bool wanted = linkScheduleWantsUnlocked();
+  if (wanted == scheduleHolding) {
+    return;
+  }
+  scheduleHolding = wanted;
+  if (wanted) {
+    Serial.println("[SCHEDULE] open hours started, door stays unlocked");
+    if (!relayUnlocked) {
+      relayUnlocked = true;
+      unlockStartedAt = now;
+      setRelayUnlocked(true);
+    }
+    waitingForDoorClose = false;
+  } else {
+    Serial.println("[SCHEDULE] open hours ended, locking");
+    unlockLastTriggeredAt = now - UNLOCK_DURATION_MS;  // pulse already used up: handleRelay locks when the door is shut
+    if (doorOpen) {
+      doorOpenedAt = now;  // the left-open timer starts now, not at 7 AM
+    }
+  }
+}
+
 void handleExitButton(uint32_t now) {
   // A press the interrupt timed but the loop never saw (loop was stalled).
   if (exitTapSeen) {
@@ -844,7 +882,7 @@ void handleDoorSensor(uint32_t now) {
     }
   }
 
-  if (doorOpen && !leftOpenAlarmRaised && now - doorOpenedAt >= DOOR_LEFT_OPEN_TIMEOUT_MS) {
+  if (doorOpen && !leftOpenAlarmRaised && !scheduleHolding && now - doorOpenedAt >= DOOR_LEFT_OPEN_TIMEOUT_MS) {
     leftOpenAlarmRaised = true;
     raiseAlarm(AlarmType::LeftOpen);
   }
@@ -906,6 +944,7 @@ void initFingerprint() {
 
 void setup() {
   Serial.begin(115200);
+  linkOtaBootCheck();  // may switch back to the previous firmware (see door_link.h)
 
   // Relay first so the lock is held from the earliest possible moment.
   pinMode(PIN_RELAY, OUTPUT);
@@ -940,6 +979,7 @@ void setup() {
 // ============================================================================
 
 void loop() {
+  linkLoopTick();
   const uint32_t now = millis();
 #if KEYPAD_DIAGNOSTIC
   handleKeypadDiagnostic(now);
@@ -951,6 +991,7 @@ void loop() {
   handleCommands(now);
   handleEnrollment(now);
   handleFingerprint(now);
+  handleSchedule(millis());
   handleRelay(millis());
   publishStatus(millis());
 }

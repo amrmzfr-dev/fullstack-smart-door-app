@@ -55,6 +55,21 @@ struct DoorStatus {
 // accessListBegin().
 void linkBegin();
 
+// Crash safety for OTA updates. Call linkOtaBootCheck() first thing in
+// setup(): after an update the new firmware must prove itself (WiFi/server up
+// and the main loop running) or the door switches back to the previous
+// firmware by itself — after 2 crashed boots, or 3 minutes of not being
+// healthy. Call linkLoopTick() on every loop() pass so a frozen loop counts as
+// unhealthy.
+void linkOtaBootCheck();
+void linkLoopTick();
+
+// Weekly open hours from the admin dashboard (synced with the access list and
+// saved on the door, so they work offline). True while the door should stay
+// unlocked. Uses the clock set over NTP — until that is set it says false, so
+// the door stays locked rather than open.
+bool linkScheduleWantsUnlocked();
+
 void linkPublishStatus(const DoorStatus& status);
 
 // Drops the event (and logs it) if the queue is full — never blocks.

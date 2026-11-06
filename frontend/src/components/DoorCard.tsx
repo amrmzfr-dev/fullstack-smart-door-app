@@ -3,6 +3,7 @@ import { Cpu, DoorClosed, DoorOpen, FingerprintPattern, KeyRound, Lock, LockOpen
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DoorNameDialog } from "@/components/DoorNameDialog";
+import { DoorScheduleCard } from "@/components/DoorScheduleCard";
 import { DoorSetupDialog } from "@/components/DoorSetupDialog";
 import { PinPadDialog } from "@/components/PinPadDialog";
 import { StatusCard, type StatusTone } from "@/components/StatusCard";
@@ -151,6 +152,8 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
           {door.pinSet ? "Change" : "Set PIN"}
         </Button>
       </div>
+
+      <DoorScheduleCard door={door} onChanged={onChanged} onNotice={onNotice} />
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button

@@ -1,9 +1,15 @@
 using SmartDoor.Api.Models;
+using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Contracts;
 
 public sealed record CreateDoorRequest(string Name);
 public sealed record RenameDoorRequest(string Name);
+
+// Weekly open hours. From / Until are "HH:mm" in the door's local time; Days
+// are 0 = Monday ... 6 = Sunday.
+public sealed record DoorSchedule(bool Enabled, string From, string Until, IReadOnlyList<int> Days, int UtcOffsetMinutes);
+public sealed record UpdateDoorScheduleRequest(bool Enabled, string From, string Until, IReadOnlyList<int> Days);
 
 // Admin view of a door: live state (null while offline / never seen) + PIN
 // state. Never the PIN or key itself.
@@ -21,7 +27,8 @@ public sealed record DoorResponse(
     int? Rssi,
     bool PinSet,
     DateTimeOffset? PinUpdatedAt,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    DoorSchedule Schedule)
 {
     public static DoorResponse From(Door door, DoorStatusSnapshot? snapshot, bool online) =>
         new(
@@ -38,7 +45,8 @@ public sealed record DoorResponse(
             snapshot?.Rssi,
             door.PinHash is not null,
             door.PinUpdatedAt,
-            door.CreatedAt);
+            door.CreatedAt,
+            DoorScheduleRules.ToDto(door));
 }
 
 // What goes into a door controller's secrets.h. Shown once, when the door is

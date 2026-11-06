@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, DeviceCommand, Door, DoorSetup, Member, PhoneInvite } from "@/types";
+import type { AccessEvent, DeviceCommand, Door, DoorSchedule, DoorSetup, Member, PhoneInvite } from "@/types";
 
 // ---- Doors ----
 
@@ -33,6 +33,12 @@ export function setDoorPin(doorId: string, pin: string): Promise<Door> {
 
 export function clearDoorPin(doorId: string): Promise<Door> {
   return apiDelete<Door>(`/doors/${doorId}/pin`);
+}
+
+// ---- Open hours (unlocked from..until on chosen days) ----
+
+export function setDoorSchedule(doorId: string, schedule: Pick<DoorSchedule, "enabled" | "from" | "until" | "days">): Promise<Door> {
+  return apiPut<Door>(`/doors/${doorId}/schedule`, schedule);
 }
 
 // ---- Log ----

@@ -22,6 +22,17 @@ public class Door
     public string? PinHash { get; set; }
     public DateTimeOffset? PinUpdatedAt { get; set; }
 
+    // Weekly "open hours": while the schedule is on, the door stays unlocked
+    // between From and Until on the chosen days, then locks and needs a PIN /
+    // fingerprint / phone again. The controller keeps the clock itself (NTP),
+    // so it works offline. Minutes are since midnight in the door's local time;
+    // Days is a bit mask, Monday = bit 0 ... Sunday = bit 6.
+    public bool ScheduleEnabled { get; set; }
+    public int ScheduleFromMinutes { get; set; } = 7 * 60;
+    public int ScheduleUntilMinutes { get; set; } = 19 * 60;
+    public int ScheduleDays { get; set; } = 0b0011111;  // Monday to Friday
+    public int ScheduleUtcOffsetMinutes { get; set; } = 8 * 60;  // Malaysia
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 

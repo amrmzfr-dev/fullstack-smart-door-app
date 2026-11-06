@@ -162,6 +162,21 @@ namespace SmartDoor.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("PinUpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("ScheduleDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ScheduleEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ScheduleFromMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScheduleUntilMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScheduleUtcOffsetMinutes")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("KeyHash")

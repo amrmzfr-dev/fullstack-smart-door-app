@@ -2,8 +2,10 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
 #include <PubSubClient.h>
 #include <Update.h>
+#include <esp_ota_ops.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
@@ -31,7 +33,7 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "2.2.1";  // 2.2.0: can update itself over WiFi (OTA). 2.2.1: OTA test build, no other change
+constexpr char FIRMWARE_VERSION[] = "2.4.0";  // 2.2.0: OTA. 2.3.0: OTA crash safety (goes back to the old firmware if the new one is unhealthy)
 
 // OTA update (see runOtaUpdate). The file is only ever fetched from this
 // backend, from under this path, with the device key.
@@ -41,6 +43,13 @@ constexpr size_t OTA_SHA256_HEX_LENGTH = 64;
 constexpr uint32_t OTA_HTTP_TIMEOUT_MS = 10000;
 constexpr uint32_t OTA_STALL_TIMEOUT_MS = 15000;  // no bytes for this long = give up
 constexpr uint32_t OTA_REPORT_FLUSH_MS = 3000;    // how long to wait for the final report to go out
+
+// Crash safety after an update (see linkOtaBootCheck).
+constexpr char OTA_NVS_NAMESPACE[] = "ota";
+constexpr uint8_t OTA_MAX_UNCONFIRMED_BOOTS = 2;    // 3rd boot without confirming -> go back
+constexpr uint32_t OTA_CONFIRM_AFTER_MS = 30000;    // must have run healthy this long
+constexpr uint32_t OTA_CONFIRM_DEADLINE_MS = 180000; // still not healthy by now -> go back
+constexpr uint32_t OTA_LOOP_STALE_MS = 2000;        // main loop silent this long = frozen
 
 // Also how often app unlocks are picked up, so kept short. A door open/close
 // or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
@@ -472,6 +481,66 @@ bool ensureMqtt(uint32_t now) {
   return true;
 }
 
+// ---- Weekly open hours -------------------------------------------------------
+
+struct OpenHours {
+  bool enabled;
+  uint8_t days;         // bit 0 = Monday ... bit 6 = Sunday
+  uint16_t from;        // minutes since local midnight
+  uint16_t until;
+  int16_t utcOffsetMin;
+};
+
+OpenHours openHours = {};
+
+OpenHours currentOpenHours() {
+  portENTER_CRITICAL(&statusMux);
+  const OpenHours copy = openHours;
+  portEXIT_CRITICAL(&statusMux);
+  return copy;
+}
+
+bool validOpenHours(const OpenHours& hours) {
+  return hours.from < hours.until && hours.until <= 24 * 60 && hours.utcOffsetMin >= -14 * 60 &&
+         hours.utcOffsetMin <= 14 * 60;
+}
+
+void loadOpenHours() {
+  Preferences prefs;
+  OpenHours saved = {};
+  if (prefs.begin("hours", true)) {
+    if (prefs.getBytes("v1", &saved, sizeof(saved)) == sizeof(saved) && validOpenHours(saved)) {
+      portENTER_CRITICAL(&statusMux);
+      openHours = saved;
+      portEXIT_CRITICAL(&statusMux);
+      Serial.printf("[SCHEDULE] loaded: %s, %02u:%02u-%02u:%02u, days mask 0x%02X\n", saved.enabled ? "on" : "off",
+                    saved.from / 60, saved.from % 60, saved.until / 60, saved.until % 60, saved.days);
+    }
+    prefs.end();
+  }
+}
+
+void storeOpenHours(const OpenHours& next) {
+  if (!validOpenHours(next)) {
+    Serial.println("[SCHEDULE] ignoring an invalid schedule from the server");
+    return;
+  }
+  const OpenHours now = currentOpenHours();
+  if (memcmp(&now, &next, sizeof(next)) == 0) {
+    return;
+  }
+  portENTER_CRITICAL(&statusMux);
+  openHours = next;
+  portEXIT_CRITICAL(&statusMux);
+  Preferences prefs;
+  if (prefs.begin("hours", false)) {
+    prefs.putBytes("v1", &next, sizeof(next));
+    prefs.end();
+  }
+  Serial.printf("[SCHEDULE] updated: %s, %02u:%02u-%02u:%02u, days mask 0x%02X\n", next.enabled ? "on" : "off",
+                next.from / 60, next.from % 60, next.until / 60, next.until % 60, next.days);
+}
+
 void syncAccessList() {
   String response;
   const int code = sendRequest("GET", "/device/access-list", "", &response);
@@ -515,6 +584,19 @@ void syncAccessList() {
       break;
     }
     data.fingerprintSlots[data.fingerprintSlotCount++] = slot.as<uint16_t>();
+  }
+
+  // Before the version is saved: if power drops in between, the next sync
+  // still sees a different version and runs again.
+  JsonObjectConst schedule = doc["schedule"].as<JsonObjectConst>();
+  if (!schedule.isNull()) {
+    OpenHours next = {};
+    next.enabled = schedule["enabled"] | false;
+    next.days = schedule["days"] | 0;
+    next.from = schedule["from"] | 0;
+    next.until = schedule["until"] | 0;
+    next.utcOffsetMin = schedule["utcOffsetMinutes"] | 0;
+    storeOpenHours(next);
   }
 
   accessListReplace(data);
@@ -622,6 +704,52 @@ void flushReports(uint32_t now) {
 // whole file arrived AND its SHA-256 matches the one in the command. A failed
 // or interrupted download just leaves the door on the old firmware.
 // ============================================================================
+
+// ---- Crash safety ----------------------------------------------------------
+// Right before restarting into a new firmware, the old one sets "pending". The
+// new one counts every boot while pending; once it has been healthy for a
+// while it clears the flag ("confirmed"). If it never gets there, the door
+// points the boot back at the other slot, which still holds the old firmware.
+
+bool otaUnconfirmed = false;
+volatile uint32_t lastLoopTickAt = 0;
+
+void setOtaPending(bool pending) {
+  Preferences prefs;
+  if (prefs.begin(OTA_NVS_NAMESPACE, false)) {
+    prefs.putBool("pending", pending);
+    prefs.putUChar("tries", 0);
+    prefs.end();
+  }
+}
+
+void rollbackToPreviousFirmware(const char* reason) {
+  Serial.printf("[OTA] new firmware is not healthy (%s) — going back to the previous one\n", reason);
+  setOtaPending(false);
+  const esp_partition_t* previous = esp_ota_get_next_update_partition(nullptr);
+  if (previous != nullptr && esp_ota_set_boot_partition(previous) == ESP_OK) {
+    delay(300);
+    ESP.restart();
+  }
+  Serial.println("[OTA] could not switch back, staying on this firmware");
+}
+
+// Net task, every pass: confirm the new firmware once it has proven itself.
+void checkOtaConfirm() {
+  if (!otaUnconfirmed) {
+    return;
+  }
+  const uint32_t now = millis();
+  const bool online = mqtt.connected() || backendReachable;
+  const bool loopAlive = now - lastLoopTickAt < OTA_LOOP_STALE_MS;
+  if (online && loopAlive && now >= OTA_CONFIRM_AFTER_MS) {
+    setOtaPending(false);
+    otaUnconfirmed = false;
+    Serial.println("[OTA] new firmware confirmed healthy");
+  } else if (now >= OTA_CONFIRM_DEADLINE_MS) {
+    rollbackToPreviousFirmware(online ? "main loop frozen" : "no connection to the server");
+  }
+}
 
 // Keeps MQTT alive and reports flowing while the download blocks the normal
 // net loop (otherwise the broker drops the door after the 10s keep-alive).
@@ -755,6 +883,7 @@ void runOtaUpdate() {
     return;
   }
 
+  setOtaPending(true);  // the new firmware must confirm itself, or the door goes back
   Serial.printf("[OTA] installed %u bytes, restarting\n", static_cast<unsigned>(written));
   reportOta(req.id, CommandState::Succeeded, "", "Updated, door is restarting");
   const uint32_t flushStart = millis();
@@ -776,6 +905,7 @@ void runOtaUpdate() {
 void netTask(void*) {
   for (;;) {
     const uint32_t now = millis();
+    checkOtaConfirm();
     if (ensureWifi(now)) {
       const bool onMqtt = ensureMqtt(now);
       if (onMqtt) {
@@ -808,6 +938,58 @@ void netTask(void*) {
 // Public API
 // ============================================================================
 
+void linkOtaBootCheck() {
+  lastLoopTickAt = millis();
+  Preferences prefs;
+  if (!prefs.begin(OTA_NVS_NAMESPACE, false)) {
+    return;
+  }
+  if (!prefs.getBool("pending", false)) {
+    prefs.end();
+    return;
+  }
+  // First boots of a freshly installed firmware: count them. A crash before it
+  // is confirmed just comes back here on the next boot.
+  const uint8_t boots = prefs.getUChar("tries", 0) + 1;
+  prefs.putUChar("tries", boots);
+  prefs.end();
+  Serial.printf("[OTA] first run of a new firmware, boot %u (confirms after %us healthy)\n", boots,
+                static_cast<unsigned>(OTA_CONFIRM_AFTER_MS / 1000));
+  if (boots > OTA_MAX_UNCONFIRMED_BOOTS) {
+    rollbackToPreviousFirmware("it keeps crashing");
+    return;
+  }
+  otaUnconfirmed = true;
+#ifdef OTA_TEST_CRASH
+  delay(1500);
+  abort();  // test build only: a firmware that crashes on every start
+#endif
+}
+
+void linkLoopTick() {
+  lastLoopTickAt = millis();
+}
+
+bool linkScheduleWantsUnlocked() {
+  const OpenHours hours = currentOpenHours();
+  if (!hours.enabled) {
+    return false;
+  }
+  const time_t utc = time(nullptr);
+  if (utc < 1700000000) {
+    return false;  // clock not set yet (no NTP) — stay locked
+  }
+  const time_t local = utc + static_cast<time_t>(hours.utcOffsetMin) * 60;
+  struct tm parts;
+  gmtime_r(&local, &parts);
+  const int day = (parts.tm_wday + 6) % 7;  // Monday = 0
+  if ((hours.days & (1 << day)) == 0) {
+    return false;
+  }
+  const int minutes = parts.tm_hour * 60 + parts.tm_min;
+  return minutes >= hours.from && minutes < hours.until;
+}
+
 void linkBegin() {
   eventQueue = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(DoorEvent));
   commandQueue = xQueueCreate(COMMAND_QUEUE_LENGTH, sizeof(DoorCommand));
@@ -833,6 +1015,11 @@ void linkBegin() {
   mqtt.setKeepAlive(MQTT_KEEPALIVE_S);
   mqtt.setSocketTimeout(5);
   mqtt.setBufferSize(MQTT_BUFFER_BYTES);
+
+  // The door has no clock of its own; the open-hours schedule needs the time.
+  // NTP keeps it right (re-checked hourly) and only needs the internet, not our server.
+  loadOpenHours();
+  configTime(0, 0, "pool.ntp.org", "time.google.com");
 
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);

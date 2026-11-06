@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using SmartDoor.Api.Contracts;
 using SmartDoor.Api.Data;
 using SmartDoor.Api.Models;
 
@@ -57,6 +58,29 @@ public class DoorService(AppDbContext dbContext) : IDoorService
         }
 
         door.Name = cleanName;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Door>.Ok(door);
+    }
+
+    public async Task<ServiceResult<Door>> UpdateScheduleAsync(
+        Guid id,
+        UpdateDoorScheduleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var door = await dbContext.Doors.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (door is null)
+        {
+            return ServiceResult<Door>.NotFound("Door not found.");
+        }
+
+        var error = DoorScheduleRules.Apply(door, request);
+        if (error is not null)
+        {
+            return ServiceResult<Door>.Invalid(error);
+        }
+
+        // The access-list version changes with the schedule, so the controller
+        // notices and downloads it within seconds.
         await dbContext.SaveChangesAsync(cancellationToken);
         return ServiceResult<Door>.Ok(door);
     }

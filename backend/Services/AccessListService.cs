@@ -31,10 +31,19 @@ public class AccessListService(AppDbContext dbContext) : IAccessListService
             ? [new AccessListPin(Guid.Empty, door.PinSalt, door.PinHash)]
             : [];
 
-        return new AccessList(ComputeVersion(pins, slots), pins, slots);
+        var schedule = door is null
+            ? new AccessSchedule(false, 0, 0, 0, 0)
+            : new AccessSchedule(
+                door.ScheduleEnabled,
+                door.ScheduleFromMinutes,
+                door.ScheduleUntilMinutes,
+                door.ScheduleDays,
+                door.ScheduleUtcOffsetMinutes);
+
+        return new AccessList(ComputeVersion(pins, slots, schedule), pins, slots, schedule);
     }
 
-    private static string ComputeVersion(IEnumerable<AccessListPin> pins, IEnumerable<int> slots)
+    private static string ComputeVersion(IEnumerable<AccessListPin> pins, IEnumerable<int> slots, AccessSchedule schedule)
     {
         var builder = new StringBuilder();
         foreach (var pin in pins)
@@ -42,6 +51,8 @@ public class AccessListService(AppDbContext dbContext) : IAccessListService
             builder.Append(pin.MemberId).Append(':').Append(pin.Salt).Append(':').Append(pin.Hash).Append(';');
         }
         builder.Append('|').AppendJoin(",", slots);
+        builder.Append('|').Append(schedule.Enabled).Append(':').Append(schedule.From).Append(':')
+            .Append(schedule.Until).Append(':').Append(schedule.Days).Append(':').Append(schedule.UtcOffsetMinutes);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
         return Convert.ToHexStringLower(hash)[..16];
