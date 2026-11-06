@@ -31,6 +31,13 @@ export type CommandStatus =
 // Reported by the firmware while enrolling (see enrollSetStep in main.cpp).
 export type EnrollStep = "place_finger" | "remove_finger" | "place_again" | "saving";
 
+// The signed-in admin. passwordHint is e.g. "sh*******26" (null until their
+// next sign-in on accounts that predate hints).
+export interface Me {
+  username: string;
+  passwordHint: string | null;
+}
+
 export interface LoginResponse {
   token: string;
   username: string;

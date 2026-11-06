@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { DoorClosed, LogOut, ScrollText, Users, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { DoorClosed, LogOut, ScrollText, UserRound, Users, Wifi, WifiOff, type LucideIcon } from "lucide-react";
 
+import { ProfileDialog } from "@/components/ProfileDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useDoors, useEvents } from "@/hooks/useDoorData";
@@ -27,6 +28,7 @@ interface DashboardPageProps {
 
 export function DashboardPage({ username, onLogout, theme, onToggleTheme }: DashboardPageProps) {
   const [tab, setTab] = useState<Tab>("doors");
+  const [profileOpen, setProfileOpen] = useState(false);
   const { doors, loaded: doorsLoaded, error: statusError, refresh: refreshDoors } = useDoors();
   const { events, loading: eventsLoading } = useEvents();
 
@@ -62,6 +64,14 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
               {statusError ? "Server unreachable" : `${onlineCount} of ${doors.length} doors online`}
             </span>
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setProfileOpen(true)}
+              aria-label={`My profile${username ? ` (${username})` : ""}`}
+            >
+              <UserRound />
+            </Button>
             <Button variant="outline" size="icon" onClick={onLogout} aria-label={`Sign out ${username ?? ""}`.trim()}>
               <LogOut />
             </Button>
@@ -108,6 +118,8 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
         {tab === "people" && <PeopleTab doors={doors} />}
         {tab === "log" && <LogTab events={events} doors={doors} loading={eventsLoading} />}
       </main>
+
+      {profileOpen && <ProfileDialog onClose={() => setProfileOpen(false)} />}
 
       {/* Mobile bottom tab bar */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
