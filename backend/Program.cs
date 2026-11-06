@@ -69,6 +69,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IPinHasher, PinHasher>();
 builder.Services.AddSingleton<IDoorStatusStore, RedisDoorStatusStore>();
+builder.Services.AddSingleton<IFirmwareStore, FirmwareStore>();
 builder.Services.AddScoped<IAccessListService, AccessListService>();
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 builder.Services.AddScoped<IMemberService, MemberService>();

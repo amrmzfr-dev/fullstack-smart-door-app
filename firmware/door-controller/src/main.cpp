@@ -161,6 +161,10 @@ bool fingerprintReady = false;
 uint16_t fingerprintTemplateCount = 0;
 FingerprintState fingerprintState = FingerprintState::WaitForFinger;
 uint32_t lastFingerprintPollAt = 0;
+bool fingerprintResponding = true;  // false once the sensor stops answering
+uint8_t fingerprintTimeouts = 0;
+constexpr uint8_t FINGERPRINT_MAX_TIMEOUTS = 2;
+constexpr uint32_t FINGERPRINT_RETRY_INTERVAL_MS = 5000;
 
 // ---- Fingerprint enrollment (started from the web app) ----
 // While active, the sensor is used only for enrolling — normal fingerprint
@@ -191,6 +195,32 @@ bool waitingForDoorClose = false;  // pulse ended but door still open
 
 // ---- Inputs ----
 DebouncedInput exitButton = {PIN_EXIT_BUTTON, HIGH, HIGH, 0};
+
+// Safety net for the exit button. The main loop can stall for up to a second
+// when the fingerprint sensor stops answering, and a quick tap is over before
+// the loop looks again. This interrupt times every press on its own, so a tap
+// that the loop missed is still caught. Noise spikes are shorter than
+// EXIT_MIN_PRESS_MS and are ignored.
+constexpr uint32_t EXIT_MIN_PRESS_MS = 30;
+volatile uint32_t exitFellAt = 0;
+volatile bool exitIsDown = false;
+volatile bool exitTapSeen = false;     // a full press was timed by the interrupt
+volatile uint32_t exitTapStartedAt = 0;
+uint32_t lastExitTriggerAt = 0;        // when the loop last handled a press
+
+void IRAM_ATTR onExitButtonChange() {
+  const uint32_t t = millis();
+  if (digitalRead(PIN_EXIT_BUTTON) == LOW) {
+    exitFellAt = t;
+    exitIsDown = true;
+  } else if (exitIsDown) {
+    exitIsDown = false;
+    if (t - exitFellAt >= EXIT_MIN_PRESS_MS) {
+      exitTapStartedAt = exitFellAt;
+      exitTapSeen = true;
+    }
+  }
+}
 DebouncedInput doorSensor = {PIN_DOOR_SENSOR, HIGH, HIGH, 0};
 
 // ---- Door ----
@@ -535,12 +565,32 @@ void handleKeypadDiagnostic(uint32_t now) {
 // call is a short synchronous UART exchange with the sensor; nothing here
 // waits for a finger to arrive or leave — that is spread across loop passes.
 void handleFingerprint(uint32_t now) {
-  if (!fingerprintReady || enrollment.active || now - lastFingerprintPollAt < FINGERPRINT_POLL_INTERVAL_MS) {
+  const uint32_t interval = fingerprintResponding ? FINGERPRINT_POLL_INTERVAL_MS : FINGERPRINT_RETRY_INTERVAL_MS;
+  if (!fingerprintReady || enrollment.active || now - lastFingerprintPollAt < interval) {
     return;
   }
   lastFingerprintPollAt = now;
 
+  // Sensor went quiet: every question to it now costs up to 1s of waiting, so
+  // only ask rarely until it answers again (keeps the keypad and buttons live).
+  if (!fingerprintResponding) {
+    if (finger.verifyPassword()) {
+      fingerprintResponding = true;
+      fingerprintTimeouts = 0;
+      Serial.println("[FINGERPRINT] sensor is answering again");
+    }
+    return;
+  }
+
   const uint8_t imageResult = finger.getImage();
+  if (imageResult == FINGERPRINT_TIMEOUT) {
+    if (++fingerprintTimeouts >= FINGERPRINT_MAX_TIMEOUTS) {
+      fingerprintResponding = false;
+      Serial.println("[FINGERPRINT] sensor stopped answering — checking it every few seconds (check wiring / power)");
+    }
+    return;
+  }
+  fingerprintTimeouts = 0;
 
   // After a scan, wait for the finger to lift before accepting the next one,
   // so one long touch doesn't produce repeated matches.
@@ -750,14 +800,30 @@ void publishStatus(uint32_t now) {
 // Exit button + door sensor
 // ============================================================================
 
+void exitButtonPressed(uint32_t now) {
+  lastExitTriggerAt = now;
+  triggerUnlock(UnlockSource::ExitButton, now);
+  emitEvent(EventType::Granted, EventMethod::ExitButton);
+}
+
 void handleExitButton(uint32_t now) {
+  // A press the interrupt timed but the loop never saw (loop was stalled).
+  if (exitTapSeen) {
+    exitTapSeen = false;
+    const uint32_t startedAt = exitTapStartedAt;
+    // Already handled by the normal path below if the loop acted after the press began.
+    if (lastExitTriggerAt == 0 || static_cast<int32_t>(lastExitTriggerAt - startedAt) < 0) {
+      Serial.println("[EXIT_BUTTON] pressed (caught late — main loop was busy)");
+      exitButtonPressed(now);
+    }
+  }
+
   if (!debounceUpdate(exitButton, now)) {
     return;
   }
   if (exitButton.stableLevel == LOW) {  // press edge only; release is ignored
     Serial.println("[EXIT_BUTTON] pressed");
-    triggerUnlock(UnlockSource::ExitButton, now);
-    emitEvent(EventType::Granted, EventMethod::ExitButton);
+    exitButtonPressed(now);
   }
 }
 
@@ -847,6 +913,7 @@ void setup() {
 
   const uint32_t now = millis();
   debounceInit(exitButton, now);
+  attachInterrupt(digitalPinToInterrupt(PIN_EXIT_BUTTON), onExitButtonChange, CHANGE);
   debounceInit(doorSensor, now);
   keypad.setDebounceTime(KEYPAD_DEBOUNCE_MS);
 

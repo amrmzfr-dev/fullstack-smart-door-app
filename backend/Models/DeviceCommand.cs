@@ -5,6 +5,8 @@ public enum CommandType
     Unlock,
     EnrollFingerprint,
     DeleteFingerprint,
+    // Label holds the firmware version to install (see IFirmwareStore).
+    UpdateFirmware,
 }
 
 public enum CommandStatus

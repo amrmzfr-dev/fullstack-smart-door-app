@@ -13,6 +13,13 @@ public interface IDeviceCommandService
         AccessMethod method,
         CancellationToken cancellationToken);
 
+    // Tells one door to download and install an uploaded firmware version.
+    Task<ServiceResult<DeviceCommand>> QueueFirmwareUpdateAsync(
+        Guid doorId,
+        string version,
+        string createdBy,
+        CancellationToken cancellationToken);
+
     Task<ServiceResult<DeviceCommand>> GetAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<DeviceCommand>> CancelAsync(Guid id, CancellationToken cancellationToken);
 

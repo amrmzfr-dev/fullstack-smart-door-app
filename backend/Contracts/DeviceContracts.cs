@@ -1,4 +1,5 @@
 using SmartDoor.Api.Models;
+using SmartDoor.Api.Services;
 
 namespace SmartDoor.Api.Contracts;
 
@@ -29,9 +30,27 @@ public sealed record DeviceCommandUpdate(CommandStatus Status, string? Step, str
 
 // ---- Backend -> door controller ----
 
-public sealed record DeviceCommandDto(Guid Id, CommandType Type, int? Slot)
+// Path / Sha256 / Version are only filled for an update_firmware command: where
+// the door downloads the file from (under the API base URL), the checksum it
+// must match, and the version it will become.
+public sealed record DeviceCommandDto(
+    Guid Id,
+    CommandType Type,
+    int? Slot,
+    string? Path = null,
+    string? Sha256 = null,
+    string? Version = null)
 {
-    public static DeviceCommandDto From(DeviceCommand command) => new(command.Id, command.Type, command.Slot);
+    public static DeviceCommandDto From(DeviceCommand command, IFirmwareStore firmwareStore)
+    {
+        if (command.Type == CommandType.UpdateFirmware && command.Label is string version
+            && firmwareStore.Find(version) is { } file)
+        {
+            return new(command.Id, command.Type, null, $"/device/firmware/{file.Version}", file.Sha256, file.Version);
+        }
+
+        return new(command.Id, command.Type, command.Slot);
+    }
 }
 
 public sealed record HeartbeatResponse(string AccessListVersion, IReadOnlyList<DeviceCommandDto> Commands);

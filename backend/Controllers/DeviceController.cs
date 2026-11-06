@@ -18,7 +18,8 @@ public class DeviceController(
     IDoorStatusStore doorStatusStore,
     IAccessListService accessListService,
     IDeviceCommandService commandService,
-    IAccessEventService accessEventService) : ControllerBase
+    IAccessEventService accessEventService,
+    IFirmwareStore firmwareStore) : ControllerBase
 {
     [HttpPost("heartbeat")]
     public async Task<ActionResult<HeartbeatResponse>> HeartbeatAsync(
@@ -42,7 +43,18 @@ public class DeviceController(
 
         return Ok(new HeartbeatResponse(
             accessList.Version,
-            commands.Select(DeviceCommandDto.From).ToList()));
+            commands.Select(command => DeviceCommandDto.From(command, firmwareStore)).ToList()));
+    }
+
+    // The firmware file for an update_firmware command. Sent with a
+    // Content-Length (the door needs the size up front).
+    [HttpGet("firmware/{version}")]
+    public ActionResult GetFirmware(string version)
+    {
+        var file = firmwareStore.Find(version);
+        return file is null
+            ? NotFound()
+            : PhysicalFile(file.Path, "application/octet-stream", enableRangeProcessing: false);
     }
 
     [HttpGet("access-list")]

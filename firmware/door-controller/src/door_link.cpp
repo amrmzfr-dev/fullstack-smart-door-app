@@ -3,11 +3,14 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <PubSubClient.h>
+#include <Update.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include <mbedtls/md.h>
+#include <strings.h>
 
 #include "access_list.h"
 #include "secrets.h"
@@ -28,7 +31,16 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "2.1.0";
+constexpr char FIRMWARE_VERSION[] = "2.2.1";  // 2.2.0: can update itself over WiFi (OTA). 2.2.1: OTA test build, no other change
+
+// OTA update (see runOtaUpdate). The file is only ever fetched from this
+// backend, from under this path, with the device key.
+constexpr char OTA_PATH_PREFIX[] = "/device/firmware/";
+constexpr size_t OTA_PATH_MAX = 96;
+constexpr size_t OTA_SHA256_HEX_LENGTH = 64;
+constexpr uint32_t OTA_HTTP_TIMEOUT_MS = 10000;
+constexpr uint32_t OTA_STALL_TIMEOUT_MS = 15000;  // no bytes for this long = give up
+constexpr uint32_t OTA_REPORT_FLUSH_MS = 3000;    // how long to wait for the final report to go out
 
 // Also how often app unlocks are picked up, so kept short. A door open/close
 // or lock change sends one straight away as well (see statusChangedSinceHeartbeat).
@@ -295,12 +307,79 @@ void checkAccessVersion(const char* serverVersion) {
   }
 }
 
+// ---- OTA request: set by handleCommand, run by the net task ----------------
+
+struct OtaRequest {
+  char id[COMMAND_ID_LENGTH + 1];
+  char path[OTA_PATH_MAX];
+  char sha256[OTA_SHA256_HEX_LENGTH + 1];
+  char version[16];
+};
+
+OtaRequest otaRequest = {};
+bool otaPending = false;
+bool otaRunning = false;
+
+void reportOta(const char* commandId, CommandState state, const char* step, const char* message) {
+  CommandReport report = {};
+  strlcpy(report.id, commandId, sizeof(report.id));
+  report.state = state;
+  strlcpy(report.step, step, sizeof(report.step));
+  strlcpy(report.message, message, sizeof(report.message));
+  linkReportCommand(report);
+}
+
+bool isSha256Hex(const char* text) {
+  if (strlen(text) != OTA_SHA256_HEX_LENGTH) {
+    return false;
+  }
+  for (size_t i = 0; i < OTA_SHA256_HEX_LENGTH; i++) {
+    if (!isxdigit(static_cast<unsigned char>(text[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// { id, type: "update_firmware", path, sha256, version }. Only checks the
+// request is well formed; the download itself happens in runOtaUpdate().
+void queueOtaUpdate(JsonObjectConst item, const char* commandId) {
+  if (otaPending || otaRunning) {
+    reportOta(commandId, CommandState::Failed, "", "An update is already running");
+    return;
+  }
+  const char* path = item["path"] | "";
+  const char* sha256 = item["sha256"] | "";
+  const char* version = item["version"] | "";
+
+  if (strncmp(path, OTA_PATH_PREFIX, strlen(OTA_PATH_PREFIX)) != 0 || strstr(path, "..") != nullptr ||
+      strlen(path) >= sizeof(otaRequest.path)) {
+    reportOta(commandId, CommandState::Failed, "", "Bad update address");
+    return;
+  }
+  if (!isSha256Hex(sha256)) {
+    reportOta(commandId, CommandState::Failed, "", "Bad update checksum");
+    return;
+  }
+  strlcpy(otaRequest.id, commandId, sizeof(otaRequest.id));
+  strlcpy(otaRequest.path, path, sizeof(otaRequest.path));
+  strlcpy(otaRequest.sha256, sha256, sizeof(otaRequest.sha256));
+  strlcpy(otaRequest.version, version, sizeof(otaRequest.version));
+  otaPending = true;
+}
+
 // One command ({ id, type, slot }) from the server, over MQTT or REST.
 void handleCommand(JsonObjectConst item) {
   DoorCommand command = {};
   strlcpy(command.id, item["id"] | "", sizeof(command.id));
   command.slot = item["slot"].isNull() ? -1 : item["slot"].as<int16_t>();
   const char* type = item["type"] | "";
+
+  if (strcmp(type, "update_firmware") == 0) {
+    Serial.println("[OTA] update command received");
+    queueOtaUpdate(item, command.id);
+    return;
+  }
 
   if (!parseCommandKind(type, command.kind)) {
     Serial.printf("[NET] unknown command type '%s', rejecting\n", type);
@@ -536,6 +615,161 @@ void flushReports(uint32_t now) {
 }
 
 // ============================================================================
+// OTA — update the door's own firmware over WiFi.
+//
+// Safe by design: the new file is written to the *other* app slot, so the
+// running firmware is never touched. The door only switches to it after the
+// whole file arrived AND its SHA-256 matches the one in the command. A failed
+// or interrupted download just leaves the door on the old firmware.
+// ============================================================================
+
+// Keeps MQTT alive and reports flowing while the download blocks the normal
+// net loop (otherwise the broker drops the door after the 10s keep-alive).
+void keepLinkAlive() {
+  const uint32_t now = millis();
+  if (mqtt.connected()) {
+    mqtt.loop();
+    if (now - lastMqttStatusAt >= MQTT_STATUS_INTERVAL_MS) {
+      publishMqttStatus(now);
+    }
+  }
+  flushReports(now);
+}
+
+void otaFail(const char* commandId, const char* message) {
+  Serial.printf("[OTA] failed: %s\n", message);
+  reportOta(commandId, CommandState::Failed, "", message);
+  otaRunning = false;
+}
+
+void runOtaUpdate() {
+  otaRunning = true;
+  otaPending = false;
+  const OtaRequest req = otaRequest;
+
+  if (req.version[0] != '\0' && strcmp(req.version, FIRMWARE_VERSION) == 0) {
+    reportOta(req.id, CommandState::Succeeded, "", "Already on this version");
+    otaRunning = false;
+    return;
+  }
+
+  // The door restarts at the end — never while the lock is released.
+  portENTER_CRITICAL(&statusMux);
+  const bool locked = latestStatus.locked;
+  portEXIT_CRITICAL(&statusMux);
+  if (!locked) {
+    otaFail(req.id, "Door is unlocked, try again when locked");
+    return;
+  }
+
+  Serial.printf("[OTA] downloading %s (%s)\n", req.path, req.version);
+  reportOta(req.id, CommandState::InProgress, "downloading", "");
+
+  // Start from a fresh connection (frees the memory the idle one holds).
+  transport().stop();
+  HTTPClient http;
+  http.setReuse(false);
+  http.setConnectTimeout(OTA_HTTP_TIMEOUT_MS);
+  http.setTimeout(OTA_HTTP_TIMEOUT_MS);
+  if (!http.begin(transport(), String(API_BASE_URL) + req.path)) {
+    otaFail(req.id, "Could not connect");
+    return;
+  }
+  http.addHeader("X-Device-Key", DEVICE_API_KEY);
+
+  const int code = http.GET();
+  if (code != 200) {
+    http.end();
+    char message[48];
+    snprintf(message, sizeof(message), "Download refused (%d)", code);
+    otaFail(req.id, message);
+    return;
+  }
+  const int total = http.getSize();  // -1 when the server doesn't say how big
+  if (total <= 0) {
+    http.end();
+    otaFail(req.id, "Server sent no file size");
+    return;
+  }
+  if (!Update.begin(static_cast<size_t>(total), U_FLASH)) {
+    http.end();
+    otaFail(req.id, "Not enough room for the update");
+    return;
+  }
+
+  mbedtls_md_context_t hash;
+  mbedtls_md_init(&hash);
+  mbedtls_md_setup(&hash, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
+  mbedtls_md_starts(&hash);
+
+  WiFiClient* stream = http.getStreamPtr();
+  uint8_t buffer[1024];
+  size_t written = 0;
+  uint32_t lastDataAt = millis();
+  bool writeFailed = false;
+
+  while (written < static_cast<size_t>(total) && !writeFailed) {
+    const size_t available = stream->available();
+    if (available > 0) {
+      const size_t wanted = min(min(available, sizeof(buffer)), static_cast<size_t>(total) - written);
+      const size_t got = stream->readBytes(buffer, wanted);
+      mbedtls_md_update(&hash, buffer, got);
+      if (Update.write(buffer, got) != got) {
+        writeFailed = true;
+      }
+      written += got;
+      lastDataAt = millis();
+    } else if (!stream->connected() || millis() - lastDataAt > OTA_STALL_TIMEOUT_MS) {
+      break;
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(2));
+    }
+    keepLinkAlive();
+  }
+  http.end();
+
+  uint8_t digest[32];
+  mbedtls_md_finish(&hash, digest);
+  mbedtls_md_free(&hash);
+
+  if (writeFailed || written != static_cast<size_t>(total)) {
+    Update.abort();
+    otaFail(req.id, writeFailed ? "Could not write the update" : "Download was cut off");
+    return;
+  }
+
+  char digestHex[OTA_SHA256_HEX_LENGTH + 1];
+  for (size_t i = 0; i < sizeof(digest); i++) {
+    snprintf(&digestHex[i * 2], 3, "%02x", digest[i]);
+  }
+  if (strcasecmp(digestHex, req.sha256) != 0) {
+    Update.abort();
+    otaFail(req.id, "Checksum mismatch, update dropped");
+    return;
+  }
+
+  // end(true) also checks the image header; only now does the door pick the
+  // new slot to boot from.
+  if (!Update.end(true)) {
+    otaFail(req.id, "New firmware was rejected");
+    return;
+  }
+
+  Serial.printf("[OTA] installed %u bytes, restarting\n", static_cast<unsigned>(written));
+  reportOta(req.id, CommandState::Succeeded, "", "Updated, door is restarting");
+  const uint32_t flushStart = millis();
+  while (millis() - flushStart < OTA_REPORT_FLUSH_MS && (hasPendingReport || uxQueueMessagesWaiting(reportQueue) > 0)) {
+    keepLinkAlive();
+    vTaskDelay(pdMS_TO_TICKS(NET_LOOP_DELAY_MS));
+  }
+  if (mqtt.connected()) {
+    mqtt.disconnect();
+  }
+  vTaskDelay(pdMS_TO_TICKS(200));
+  ESP.restart();
+}
+
+// ============================================================================
 // Task
 // ============================================================================
 
@@ -552,6 +786,9 @@ void netTask(void*) {
       }
       flushReports(now);
       flushEvents(now);
+      if (otaPending) {
+        runOtaUpdate();
+      }
       if (!onMqtt && (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS || statusChangedSinceHeartbeat())) {
         lastHeartbeatAt = now;
         sendHeartbeat();

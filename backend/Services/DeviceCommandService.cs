@@ -9,6 +9,7 @@ namespace SmartDoor.Api.Services;
 public class DeviceCommandService(
     AppDbContext dbContext,
     IDoorCommandSignal commandSignal,
+    IFirmwareStore firmwareStore,
     ILogger<DeviceCommandService> logger) : IDeviceCommandService
 {
     private const int MaxCommandsPerHeartbeat = 5;
@@ -24,6 +25,11 @@ public class DeviceCommandService(
     // Door picked it up but went quiet mid-way. The firmware gives up on its
     // own after ENROLL_STEP_TIMEOUT_MS per step, so this is only a backstop.
     private static readonly TimeSpan EnrollIdleTimeout = TimeSpan.FromSeconds(60);
+
+    // Firmware update: the door must pick it up quickly; once it has, the
+    // download + install can take a minute or two (it restarts at the end).
+    private static readonly TimeSpan UpdatePickupTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan UpdateIdleTimeout = TimeSpan.FromMinutes(5);
 
     // Sent but never confirmed (door rebooted mid-way) — send it again.
     private static readonly TimeSpan DeleteResendAfter = TimeSpan.FromSeconds(60);
@@ -49,6 +55,48 @@ public class DeviceCommandService(
         // Push it to the door now (MQTT) rather than on the next round.
         commandSignal.Notify();
         return command;
+    }
+
+    public async Task<ServiceResult<DeviceCommand>> QueueFirmwareUpdateAsync(
+        Guid doorId,
+        string version,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (!await dbContext.Doors.AnyAsync(d => d.Id == doorId, cancellationToken))
+        {
+            return ServiceResult<DeviceCommand>.NotFound("Door not found.");
+        }
+
+        if (firmwareStore.Find(version) is null)
+        {
+            return ServiceResult<DeviceCommand>.NotFound("That firmware version hasn't been uploaded.");
+        }
+
+        if (await dbContext.DeviceCommands.AnyAsync(
+                c => c.DoorId == doorId
+                     && c.Type == CommandType.UpdateFirmware
+                     && (c.Status == CommandStatus.Pending
+                         || c.Status == CommandStatus.Sent
+                         || c.Status == CommandStatus.InProgress),
+                cancellationToken))
+        {
+            return ServiceResult<DeviceCommand>.Conflict("An update is already running for this door.");
+        }
+
+        var command = new DeviceCommand
+        {
+            Id = Guid.NewGuid(),
+            DoorId = doorId,
+            Type = CommandType.UpdateFirmware,
+            Label = version,
+            CreatedBy = createdBy,
+        };
+        dbContext.DeviceCommands.Add(command);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        commandSignal.Notify();
+        return ServiceResult<DeviceCommand>.Ok(command);
     }
 
     public async Task<ServiceResult<DeviceCommand>> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -286,6 +334,17 @@ public class DeviceCommandService(
 
                 case CommandType.EnrollFingerprint when idle > EnrollIdleTimeout:
                     Expire(command, now, "The door stopped responding during enrollment.");
+                    changed = true;
+                    break;
+
+                case CommandType.UpdateFirmware
+                    when command.Status == CommandStatus.Pending && idle > UpdatePickupTimeout:
+                    Expire(command, now, "The door didn't pick up the update. Is it online?");
+                    changed = true;
+                    break;
+
+                case CommandType.UpdateFirmware when idle > UpdateIdleTimeout:
+                    Expire(command, now, "The door stopped responding during the update.");
                     changed = true;
                     break;
 

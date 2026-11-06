@@ -20,6 +20,7 @@ public sealed class DoorMqttHostedService(
     IConfiguration configuration,
     IDoorStatusStore statusStore,
     IDoorCommandSignal commandSignal,
+    IFirmwareStore firmwareStore,
     ILogger<DoorMqttHostedService> logger) : BackgroundService
 {
     private static readonly TimeSpan RoundInterval = TimeSpan.FromSeconds(1);
@@ -142,7 +143,7 @@ public sealed class DoorMqttHostedService(
 
         foreach (var command in commands)
         {
-            var payload = JsonSerializer.Serialize(DeviceCommandDto.From(command), Json);
+            var payload = JsonSerializer.Serialize(DeviceCommandDto.From(command, firmwareStore), Json);
             await PublishAsync(client, DoorMqttTopics.Command(doorId), payload, retain: false, cancellationToken);
             logger.LogInformation("MQTT pushed {Type} command {Id} to door {DoorId}", command.Type, command.Id, doorId);
         }
