@@ -17,7 +17,11 @@ public class FirmwareController(
         Ok(firmwareStore.List().Select(FirmwareResponse.From).ToList());
 
     // Body = the raw .bin file (PlatformIO: .pio/build/esp32dev/firmware.bin).
+    // Send it with Content-Type: application/octet-stream — curl's default
+    // (form data) makes ASP.NET try to parse the file as a form and fail.
+    // curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/octet-stream" --data-binary @firmware.bin <api>/firmware/<version>
     [HttpPut("{version}")]
+    [Consumes("application/octet-stream")]
     [RequestSizeLimit(FirmwareStore.MaxBytes)]
     public async Task<ActionResult<FirmwareResponse>> UploadAsync(string version, CancellationToken cancellationToken)
     {
