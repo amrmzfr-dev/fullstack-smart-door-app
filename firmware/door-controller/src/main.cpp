@@ -23,6 +23,7 @@
 
 #include "access_list.h"
 #include "door_link.h"
+#include "wiegand.h"
 
 // ============================================================================
 // CONFIG — tune values here, no need to touch the logic below
@@ -47,6 +48,21 @@ constexpr uint8_t PIN_KEYPAD_ROW4 = 26;  // Keypad Row 4 — keys * 0 # (output)
 constexpr uint8_t PIN_KEYPAD_COL1 = 27;  // Keypad Col 1 — keys 1 4 7 * (input, pull-up)
 constexpr uint8_t PIN_KEYPAD_COL2 = 13;  // Keypad Col 2 — keys 2 5 8 0 (input, pull-up)
 constexpr uint8_t PIN_KEYPAD_COL3 = 25;  // Keypad Col 3 — keys 3 6 9 # (input, pull-up)
+
+// ---- Belco keypad (Wiegand: D0 / D1 wires) --------------------------------
+// Replaces the old matrix keypad: every key it sends goes through the same PIN
+// check. The keypad's D0 / D1 lines idle at its own supply voltage (5V or
+// even 12V), so they must NEVER touch an ESP32 pin directly. Each line goes
+// through a small NPN transistor (BC547 / 2N3904 / 2N2222):
+//   Belco D0 --10k--> base,  emitter --> GND (shared with the ESP32),
+//   collector --> ESP32 pin (the pin's pull-up gives it 3.3V).
+// The transistor flips the signal, so a pulse shows up as a RISING edge.
+constexpr uint8_t PIN_WIEGAND_D0 = 21;  // collector of the D0 transistor
+constexpr uint8_t PIN_WIEGAND_D1 = 22;  // collector of the D1 transistor
+constexpr bool WIEGAND_VIA_TRANSISTOR = true;  // false = lines wired straight in (3.3V keypads only)
+// 8-bit key frames are the key plus its inverse. The standard puts the key in
+// the first four bits (high nibble). If digits come out wrong, flip this.
+constexpr bool WIEGAND_KEY_IN_HIGH_NIBBLE = true;
 
 // ---- Relay module (drives EM lock) -----------------------------------------
 constexpr uint8_t PIN_RELAY = 18;  // Relay module signal (output) -> EM lock
@@ -430,13 +446,51 @@ void submitPin(uint32_t now) {
   }
 }
 
+// One key from the Belco's Wiegand burst: 4 bits = the key, 8 bits = the key
+// plus its inverse (a check). 10 = '*', 11 = '#'. Anything else (e.g. a 26-bit
+// card swipe) is logged and ignored.
+char wiegandKey(const WiegandFrame& frame) {
+  Serial.printf("[WIEGAND] %u bits: 0x%llX\n", frame.bits, static_cast<unsigned long long>(frame.value));
+  uint8_t nibble;
+  if (frame.bits == 4) {
+    nibble = frame.value & 0xF;
+  } else if (frame.bits == 8) {
+    const uint8_t high = (frame.value >> 4) & 0xF;
+    const uint8_t low = frame.value & 0xF;
+    if ((high ^ low) != 0xF) {
+      Serial.println("[WIEGAND] key check bits don't match, ignored");
+      return NO_KEY;
+    }
+    nibble = WIEGAND_KEY_IN_HIGH_NIBBLE ? high : low;
+  } else {
+    Serial.println("[WIEGAND] not a single key, ignored");
+    return NO_KEY;
+  }
+  if (nibble <= 9) {
+    return static_cast<char>('0' + nibble);
+  }
+  if (nibble == 10) {
+    return '*';
+  }
+  return nibble == 11 ? '#' : NO_KEY;
+}
+
+// A key from the Belco if one arrived, otherwise from the old matrix keypad.
+char readKey() {
+  WiegandFrame frame;
+  if (wiegandTakeFrame(frame)) {
+    return wiegandKey(frame);
+  }
+  return keypad.getKey();
+}
+
 void handleKeypad(uint32_t now) {
   if (pinLength > 0 && now - lastKeyAt >= KEYPAD_ENTRY_TIMEOUT_MS) {
     clearPinBuffer();
     Serial.println("[KEYPAD] entry timed out, cleared");
   }
 
-  const char key = keypad.getKey();
+  const char key = readKey();
   if (key == NO_KEY) {
     return;
   }
@@ -955,6 +1009,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_EXIT_BUTTON), onExitButtonChange, CHANGE);
   debounceInit(doorSensor, now);
   keypad.setDebounceTime(KEYPAD_DEBOUNCE_MS);
+  wiegandBegin(PIN_WIEGAND_D0, PIN_WIEGAND_D1, WIEGAND_VIA_TRANSISTOR);
 
   printBootBanner();
 #if KEYPAD_DIAGNOSTIC
