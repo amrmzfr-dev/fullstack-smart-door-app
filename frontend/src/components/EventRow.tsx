@@ -3,6 +3,7 @@ import {
   DoorOpen,
   FingerprintPattern,
   KeyRound,
+  LogIn,
   LogOut,
   ShieldX,
   Siren,
@@ -36,6 +37,10 @@ function eventIcon(event: AccessEvent): LucideIcon {
       return DoorOpen;
     case "door_closed":
       return DoorClosed;
+    case "sign_in":
+      return LogIn;
+    case "sign_in_failed":
+      return ShieldX;
     case "denied":
       return event.method === "fingerprint" ? FingerprintPattern : ShieldX;
     case "granted":
@@ -48,6 +53,7 @@ function eventIcon(event: AccessEvent): LucideIcon {
           return LogOut;
         case "remote":
         case "app_pin":
+        case "account":
           return Smartphone;
         case "phone_fingerprint":
           return FingerprintPattern;

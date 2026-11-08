@@ -8,6 +8,8 @@ public enum AccessEventType
     LeftOpen,
     DoorOpened,
     DoorClosed,
+    SignIn,
+    SignInFailed,
 }
 
 public enum AccessMethod
@@ -19,6 +21,7 @@ public enum AccessMethod
     Remote,
     AppPin,
     PhoneFingerprint,
+    Account,
 }
 
 public class AccessEvent

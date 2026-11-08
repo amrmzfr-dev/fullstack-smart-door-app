@@ -1,4 +1,5 @@
 import { clearSession, getToken } from "@/lib/auth";
+import { clearMemberSession, getMemberToken } from "@/lib/memberAuth";
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:5125/api";
 
@@ -12,8 +13,17 @@ export class HttpError extends Error {
   }
 }
 
+// The /account page has its own sign-in; everything else is the admin's.
+function onAccountPage(): boolean {
+  return window.location.pathname.startsWith("/account");
+}
+
+function activeToken(): string | null {
+  return onAccountPage() ? getMemberToken() : getToken();
+}
+
 function authHeaders(): Record<string, string> {
-  const token = getToken();
+  const token = activeToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -46,8 +56,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
 
   if (!response.ok) {
-    if (response.status === 401 && getToken() !== null) {
-      clearSession();
+    if (response.status === 401 && activeToken() !== null) {
+      if (onAccountPage()) {
+        clearMemberSession();
+      } else {
+        clearSession();
+      }
     }
     const text = await response.text();
     throw new HttpError(readErrorMessage(text, response.statusText), response.status);

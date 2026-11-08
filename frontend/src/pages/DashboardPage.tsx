@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DoorClosed, LogOut, ScrollText, UserRound, Users, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { DoorClosed, LayoutDashboard, LogOut, ScrollText, UserRound, Users, Wifi, WifiOff, type LucideIcon } from "lucide-react";
 
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -9,11 +9,13 @@ import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { DoorsTab } from "@/pages/DoorsTab";
 import { LogTab } from "@/pages/LogTab";
+import { OverviewTab } from "@/pages/OverviewTab";
 import { PeopleTab } from "@/pages/PeopleTab";
 
-type Tab = "doors" | "people" | "log";
+type Tab = "overview" | "doors" | "people" | "log";
 
 const TABS: ReadonlyArray<{ key: Tab; label: string; icon: LucideIcon }> = [
+  { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "doors", label: "Doors", icon: DoorClosed },
   { key: "people", label: "People", icon: Users },
   { key: "log", label: "Log", icon: ScrollText },
@@ -27,7 +29,7 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ username, onLogout, theme, onToggleTheme }: DashboardPageProps) {
-  const [tab, setTab] = useState<Tab>("doors");
+  const [tab, setTab] = useState<Tab>("overview");
   const [profileOpen, setProfileOpen] = useState(false);
   const { doors, loaded: doorsLoaded, error: statusError, refresh: refreshDoors } = useDoors();
   const { events, loading: eventsLoading } = useEvents();
@@ -45,7 +47,7 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
             </div>
             <div className="min-w-0">
               <h1 className="text-xl leading-tight font-extrabold tracking-tight uppercase">Smart Door</h1>
-              <p className="truncate font-mono text-xs text-muted-foreground">Admin · people and activity</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">Admin · doors, people and activity</p>
             </div>
           </div>
 
@@ -105,6 +107,9 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
             {statusError}
           </p>
         )}
+        {tab === "overview" && (
+          <OverviewTab doors={doors} events={events} eventsLoading={eventsLoading} onGo={setTab} />
+        )}
         {tab === "doors" && (
           <DoorsTab
             doors={doors}
@@ -123,7 +128,7 @@ export function DashboardPage({ username, onLogout, theme, onToggleTheme }: Dash
 
       {/* Mobile bottom tab bar */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}

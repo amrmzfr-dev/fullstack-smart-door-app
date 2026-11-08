@@ -2,7 +2,8 @@ using SmartDoor.Api.Models;
 
 namespace SmartDoor.Api.Contracts;
 
-public sealed record CreateMemberRequest(string Name);
+public sealed record CreateMemberRequest(string Name, string? Username = null, string? Password = null);
+public sealed record SetMemberAccountRequest(string Username, string? Password);
 public sealed record UpdateMemberRequest(string Name, bool Enabled);
 public sealed record SetMemberDoorsRequest(IReadOnlyList<Guid> DoorIds);
 
@@ -19,7 +20,11 @@ public sealed record MemberResponse(
     IReadOnlyList<Guid> DoorIds,
     IReadOnlyList<FingerprintResponse> Fingerprints,
     IReadOnlyList<PhoneKeyResponse> Phones,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    string? Username,
+    string? PasswordHint,
+    DateTimeOffset? AccountCreatedAt,
+    DateTimeOffset? LastLoginAt)
 {
     public static MemberResponse From(Member member) =>
         new(
@@ -35,5 +40,9 @@ public sealed record MemberResponse(
                 .OrderBy(k => k.CreatedAt)
                 .Select(PhoneKeyResponse.From)
                 .ToList(),
-            member.CreatedAt);
+            member.CreatedAt,
+            member.Username,
+            member.PasswordHint,
+            member.AccountCreatedAt,
+            member.LastLoginAt);
 }

@@ -57,9 +57,14 @@ builder.Services
 // public keypad app, and the door-controller endpoints, which use DeviceKey).
 builder.Services.AddAuthorization(options =>
 {
+    // A person's own (member) token must never reach admin endpoints.
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
+        .RequireAssertion(context => !context.User.HasClaim("role", JwtTokenService.MemberRole))
         .Build();
+    options.AddPolicy(MemberPolicy.Name, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireClaim("role", JwtTokenService.MemberRole));
 });
 
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
@@ -80,6 +85,7 @@ builder.Services.AddScoped<IDoorPinService, DoorPinService>();
 builder.Services.AddScoped<IDoorAccessService, DoorAccessService>();
 builder.Services.AddScoped<IPhoneKeyService, PhoneKeyService>();
 builder.Services.AddScoped<IPhoneInviteService, PhoneInviteService>();
+builder.Services.AddScoped<IStatsService, StatsService>();
 
 // Always-on door link over MQTT (off when Mqtt:Host is empty).
 builder.Services.AddSingleton<IDoorCommandSignal, DoorCommandSignal>();

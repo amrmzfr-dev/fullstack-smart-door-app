@@ -83,6 +83,70 @@ public class DoorAccessService(
             await commandService.QueueUnlockAsync(doorId, member, method, cancellationToken));
     }
 
+    public async Task<ServiceResult<DeviceCommand>> UnlockForAccountAsync(
+        Guid doorId,
+        Member member,
+        string? pin,
+        CancellationToken cancellationToken)
+    {
+        var door = await dbContext.Doors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == doorId, cancellationToken);
+        if (door is null)
+        {
+            return ServiceResult<DeviceCommand>.NotFound(NoSuchDoor);
+        }
+
+        if (!member.Enabled)
+        {
+            return ServiceResult<DeviceCommand>.Invalid("Your account is switched off.");
+        }
+
+        var allowed = await dbContext.MemberDoors
+            .AnyAsync(md => md.MemberId == member.Id && md.DoorId == doorId, cancellationToken);
+        if (!allowed)
+        {
+            return ServiceResult<DeviceCommand>.Invalid("You can't open this door.");
+        }
+
+        // Checked before the PIN so a guess is not used up on an offline door.
+        if (!await doorStatusStore.IsOnlineAsync(doorId))
+        {
+            return ServiceResult<DeviceCommand>.Conflict(DoorOffline);
+        }
+
+        if (door.PinRequired)
+        {
+            if (door.PinHash is null)
+            {
+                return ServiceResult<DeviceCommand>.Invalid("This door has no PIN yet. Ask your admin to set one.");
+            }
+
+            if (string.IsNullOrEmpty(pin))
+            {
+                return ServiceResult<DeviceCommand>.Invalid("Type this door's PIN.");
+            }
+
+            if (!await doorPinService.VerifyAsync(doorId, pin, cancellationToken))
+            {
+                dbContext.AccessEvents.Add(new AccessEvent
+                {
+                    Id = Guid.NewGuid(),
+                    Type = AccessEventType.Denied,
+                    Method = AccessMethod.Account,
+                    MemberId = member.Id,
+                    MemberName = member.Name,
+                    DoorId = door.Id,
+                    DoorName = door.Name,
+                    OccurredAt = DateTimeOffset.UtcNow,
+                });
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult<DeviceCommand>.Invalid(WrongPin);
+            }
+        }
+
+        return ServiceResult<DeviceCommand>.Ok(
+            await commandService.QueueUnlockAsync(doorId, member, AccessMethod.Account, cancellationToken));
+    }
+
     public async Task<ServiceResult<DeviceCommand>> WaitForUnlockChangeAsync(
         Guid id,
         CommandStatus from,

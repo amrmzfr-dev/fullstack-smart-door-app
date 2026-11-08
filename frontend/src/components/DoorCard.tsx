@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { Cpu, DoorClosed, DoorOpen, FingerprintPattern, KeyRound, Lock, LockOpen, Pencil, PlugZap, Trash2 } from "lucide-react";
+import {
+  Cpu,
+  DoorClosed,
+  DoorOpen,
+  FingerprintPattern,
+  KeyRound,
+  Lock,
+  LockOpen,
+  Pencil,
+  PlugZap,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DoorNameDialog } from "@/components/DoorNameDialog";
@@ -7,9 +19,10 @@ import { DoorScheduleCard } from "@/components/DoorScheduleCard";
 import { DoorSetupDialog } from "@/components/DoorSetupDialog";
 import { PinPadDialog } from "@/components/PinPadDialog";
 import { StatusCard, type StatusTone } from "@/components/StatusCard";
+import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api";
-import { clearDoorPin, deleteDoor, renameDoor, resetDoorKey } from "@/lib/door";
+import { clearDoorPin, deleteDoor, renameDoor, resetDoorKey, setDoorPinRequired } from "@/lib/door";
 import { formatAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Door, DoorSetup } from "@/types";
@@ -151,6 +164,35 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
         <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog("pin")}>
           {door.pinSet ? "Change" : "Set PIN"}
         </Button>
+      </div>
+
+      {/* Do signed-in people need the PIN, or just press Unlock? */}
+      <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
+        <ShieldCheck className="size-4 flex-none text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">PIN required for account unlock</p>
+          <p className="text-xs text-muted-foreground">
+            {door.pinRequired
+              ? "On — people signed in on their phone must also type this door's PIN."
+              : "Off — people signed in on their phone just press Unlock. The door keypad still needs the PIN."}
+          </p>
+        </div>
+        <Switch
+          checked={door.pinRequired}
+          disabled={busy}
+          label={`PIN required to unlock ${door.name} from an account`}
+          onChange={(pinRequired) =>
+            void run(async () => {
+              await setDoorPinRequired(door.id, pinRequired);
+              onNotice(
+                "success",
+                pinRequired
+                  ? `${door.name}: PIN is now required for account unlock`
+                  : `${door.name}: signed-in people can unlock without the PIN`,
+              );
+            })
+          }
+        />
       </div>
 
       <DoorScheduleCard door={door} onChanged={onChanged} onNotice={onNotice} />

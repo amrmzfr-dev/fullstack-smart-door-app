@@ -1,8 +1,8 @@
-import { DoorClosed, FingerprintPattern, Plus, Smartphone, Trash2, X } from "lucide-react";
+import { DoorClosed, FingerprintPattern, History, KeyRound, Plus, Smartphone, Trash2, UserRound, X } from "lucide-react";
 
 import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
-import { initials } from "@/lib/format";
+import { formatAgo, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Door, Fingerprint, Member, PhoneKey } from "@/types";
 
@@ -17,6 +17,9 @@ interface MemberCardProps {
   onSetUpPhone: () => void;
   onDeletePhone: (phone: PhoneKey) => void;
   onDelete: () => void;
+  onManageAccount: () => void;
+  onRemoveAccount: () => void;
+  onHistory: () => void;
 }
 
 export function MemberCard({
@@ -30,6 +33,9 @@ export function MemberCard({
   onSetUpPhone,
   onDeletePhone,
   onDelete,
+  onManageAccount,
+  onRemoveAccount,
+  onHistory,
 }: MemberCardProps) {
   const allowedDoors = doors.filter((door) => member.doorIds.includes(door.id));
 
@@ -58,6 +64,37 @@ export function MemberCard({
           onChange={onToggleEnabled}
           label={member.enabled ? `Disable ${member.name}` : `Enable ${member.name}`}
         />
+      </div>
+
+      {/* Their sign-in for the /account page */}
+      <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+        <div className="flex items-center gap-3">
+          <UserRound className="size-4 flex-none text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold">Account</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {member.username === null
+                ? "No sign-in — they can't use the account page"
+                : member.lastLoginAt
+                  ? `${member.username} · last signed in ${formatAgo(member.lastLoginAt)}`
+                  : `${member.username} · never signed in yet`}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" disabled={busy} onClick={onManageAccount}>
+            {member.username === null ? <Plus /> : <KeyRound />}
+            {member.username === null ? "Create" : "Change"}
+          </Button>
+        </div>
+        {member.username !== null && (
+          <div className="flex flex-wrap items-center gap-2 pl-7">
+            {member.passwordHint && (
+              <span className="font-mono text-xs text-muted-foreground">Password: {member.passwordHint}</span>
+            )}
+            <Button variant="ghost" size="xs" disabled={busy} onClick={onRemoveAccount}>
+              Remove sign-in
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Which doors this person may open */}
@@ -183,7 +220,11 @@ export function MemberCard({
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={onHistory}>
+          <History />
+          History
+        </Button>
         <Button variant="destructive" size="sm" disabled={busy} onClick={onDelete}>
           <Trash2 />
           Delete person

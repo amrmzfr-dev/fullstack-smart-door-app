@@ -20,7 +20,7 @@ public class MembersController(IMemberService memberService) : ControllerBase
         [FromBody] CreateMemberRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await memberService.CreateAsync(request.Name, cancellationToken);
+        var result = await memberService.CreateAsync(request.Name, request.Username, request.Password, cancellationToken);
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
 
@@ -32,6 +32,36 @@ public class MembersController(IMemberService memberService) : ControllerBase
     {
         var result = await memberService.UpdateAsync(id, request.Name, request.Enabled, cancellationToken);
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
+    }
+
+    // Create or change the person's sign-in (a missing password keeps the old one).
+    [HttpPut("{id:guid}/account")]
+    public async Task<ActionResult<MemberResponse>> SetAccountAsync(
+        Guid id,
+        [FromBody] SetMemberAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await memberService.SetAccountAsync(id, request.Username, request.Password, cancellationToken);
+        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
+    }
+
+    [HttpDelete("{id:guid}/account")]
+    public async Task<ActionResult<MemberResponse>> ClearAccountAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await memberService.ClearAccountAsync(id, cancellationToken);
+        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
+    }
+
+    // One person's own history, newest first.
+    [HttpGet("{id:guid}/events")]
+    public async Task<ActionResult<IReadOnlyList<AccessEventResponse>>> EventsAsync(
+        Guid id,
+        [FromServices] IAccessEventService accessEventService,
+        [FromQuery] int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        var events = await accessEventService.ListForMemberAsync(id, limit, cancellationToken);
+        return Ok(events.Select(AccessEventResponse.From).ToList());
     }
 
     // Which doors this person may open (replaces the whole set).

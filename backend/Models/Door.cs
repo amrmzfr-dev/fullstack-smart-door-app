@@ -22,6 +22,11 @@ public class Door
     public string? PinHash { get; set; }
     public DateTimeOffset? PinUpdatedAt { get; set; }
 
+    // On: a signed-in person must type this door's PIN to open it from their
+    // account. Off: they just press Unlock. (The door's own keypad and the
+    // public keypad app always use the PIN.)
+    public bool PinRequired { get; set; } = true;
+
     // Weekly "open hours": while the schedule is on, the door stays unlocked
     // between From and Until on the chosen days, then locks and needs a PIN /
     // fingerprint / phone again. The controller keeps the clock itself (NTP),

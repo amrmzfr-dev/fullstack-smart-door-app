@@ -15,6 +15,14 @@ public interface IDoorAccessService
         AccessMethod method,
         CancellationToken cancellationToken);
 
+    // A signed-in person pressing Unlock. Asks for the door's PIN only when
+    // that door is set to require it.
+    Task<ServiceResult<DeviceCommand>> UnlockForAccountAsync(
+        Guid doorId,
+        Member member,
+        string? pin,
+        CancellationToken cancellationToken);
+
     Task<ServiceResult<DeviceCommand>> GetUnlockAsync(Guid id, CancellationToken cancellationToken);
 
     // Returns as soon as the unlock's status differs from `from` (or after a

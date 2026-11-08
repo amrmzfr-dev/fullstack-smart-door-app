@@ -9,6 +9,8 @@ interface LoginPageProps {
   onLogin: (username: string, password: string) => Promise<void>;
   theme: Theme;
   onToggleTheme: () => void;
+  // Line under the title; defaults to the admin wording.
+  subtitle?: string;
 }
 
 const INPUT_CLASS =
@@ -23,7 +25,12 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
+export function LoginPage({
+  onLogin,
+  theme,
+  onToggleTheme,
+  subtitle = "Sign in to manage PINs, fingerprints and the lock",
+}: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +46,7 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
     } catch (err) {
       setError(
         err instanceof HttpError && err.status === 401
-          ? "Wrong username or password."
+          ? err.message || "Wrong username or password."
           : "Couldn't reach the server. Try again.",
       );
     } finally {
@@ -60,7 +67,7 @@ export function LoginPage({ onLogin, theme, onToggleTheme }: LoginPageProps) {
           </div>
           <h1 className="text-[26px] leading-[.95] font-extrabold tracking-[-.03em] uppercase">Smart Door</h1>
           <p className="font-mono text-[11px] tracking-[.04em] text-muted-foreground">
-            Sign in to manage PINs, fingerprints and the lock
+            {subtitle}
           </p>
         </div>
 

@@ -1,16 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
-import { Plus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, Search, Users } from "lucide-react";
 
+import { AccountDialog } from "@/components/AccountDialog";
 import { AddMemberDialog } from "@/components/AddMemberDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EnrollFingerprintDialog } from "@/components/EnrollFingerprintDialog";
 import { MemberCard } from "@/components/MemberCard";
+import { MemberHistoryDialog } from "@/components/MemberHistoryDialog";
 import { PhoneInviteDialog } from "@/components/PhoneInviteDialog";
 import { SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useMembers } from "@/hooks/useDoorData";
 import { errorMessage } from "@/lib/api";
-import { deleteFingerprint, deleteMember, deletePhoneKey, setMemberDoors, updateMember } from "@/lib/door";
+import {
+  clearMemberAccount,
+  deleteFingerprint,
+  deleteMember,
+  deletePhoneKey,
+  setMemberDoors,
+  updateMember,
+} from "@/lib/door";
 import { cn } from "@/lib/utils";
 import type { Door, Fingerprint, Member, PhoneKey } from "@/types";
 
@@ -20,13 +30,32 @@ type Dialog =
   | { kind: "add" }
   | { kind: "enroll"; member: Member; door: Door }
   | { kind: "phone-invite"; member: Member }
+  | { kind: "account"; member: Member }
+  | { kind: "history"; member: Member }
+  | { kind: "remove-account"; member: Member }
   | { kind: "delete-member"; member: Member }
   | { kind: "delete-fingerprint"; member: Member; fingerprint: Fingerprint }
   | { kind: "delete-phone"; member: Member; phone: PhoneKey };
 
+type Filter = "all" | "enabled" | "disabled" | "no-account" | "no-access";
+
+const FILTERS: ReadonlyArray<{ key: Filter; label: string }> = [
+  { key: "all", label: "Everyone" },
+  { key: "enabled", label: "Enabled" },
+  { key: "disabled", label: "Disabled" },
+  { key: "no-account", label: "No sign-in" },
+  { key: "no-access", label: "No way in" },
+];
+
 interface Notice {
   tone: "success" | "error";
   text: string;
+}
+
+// "No way in" = nothing registered at all: no fingerprint, no phone and no
+// sign-in, so this person can only use the shared door PIN.
+function hasNoWayIn(member: Member): boolean {
+  return member.fingerprints.length === 0 && member.phones.length === 0 && member.username === null;
 }
 
 export function PeopleTab({ doors }: { doors: Door[] }) {
@@ -35,6 +64,8 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     if (notice === null) return;
@@ -62,7 +93,10 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
     const target = dialog;
     if (
       target === null ||
-      (target.kind !== "delete-member" && target.kind !== "delete-fingerprint" && target.kind !== "delete-phone")
+      (target.kind !== "delete-member" &&
+        target.kind !== "delete-fingerprint" &&
+        target.kind !== "delete-phone" &&
+        target.kind !== "remove-account")
     )
       return;
     setDeleting(true);
@@ -73,6 +107,9 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       } else if (target.kind === "delete-fingerprint") {
         await deleteFingerprint(target.fingerprint.id);
         setNotice({ tone: "success", text: `${target.fingerprint.label} removed from ${target.member.name}` });
+      } else if (target.kind === "remove-account") {
+        await clearMemberAccount(target.member.id);
+        setNotice({ tone: "success", text: `${target.member.name}'s sign-in removed` });
       } else {
         await deletePhoneKey(target.phone.id);
         setNotice({ tone: "success", text: `${target.phone.label} removed from ${target.member.name}` });
@@ -86,12 +123,46 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
     }
   };
 
-  const fingerprintCount = members.reduce((total, member) => total + member.fingerprints.length, 0);
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return members.filter((member) => {
+      if (
+        needle !== "" &&
+        !member.name.toLowerCase().includes(needle) &&
+        !(member.username ?? "").toLowerCase().includes(needle)
+      ) {
+        return false;
+      }
+      switch (filter) {
+        case "enabled":
+          return member.enabled;
+        case "disabled":
+          return !member.enabled;
+        case "no-account":
+          return member.username === null;
+        case "no-access":
+          return hasNoWayIn(member);
+        case "all":
+          return true;
+      }
+    });
+  }, [members, query, filter]);
 
-  // People are only for fingerprints — the PIN is one for everyone (Door tab).
+  const counts: Record<Filter, number> = {
+    all: members.length,
+    enabled: members.filter((member) => member.enabled).length,
+    disabled: members.filter((member) => !member.enabled).length,
+    "no-account": members.filter((member) => member.username === null).length,
+    "no-access": members.filter(hasNoWayIn).length,
+  };
+
+  const fingerprintCount = members.reduce((total, member) => total + member.fingerprints.length, 0);
+  const phoneCount = members.reduce((total, member) => total + member.phones.length, 0);
+  const accountCount = members.filter((member) => member.username !== null).length;
+
   return (
     <div className="space-y-4">
-      <SectionHeading label="People" title="Fingerprints">
+      <SectionHeading label="People" title="Accounts, fingerprints and phones">
         <Button onClick={() => setDialog({ kind: "add" })}>
           <Plus />
           Add person
@@ -99,11 +170,42 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       </SectionHeading>
 
       <p className="text-xs text-muted-foreground">
-        {members.length} {members.length === 1 ? "person" : "people"} · {fingerprintCount}{" "}
-        {fingerprintCount === 1 ? "fingerprint" : "fingerprints"}
+        {members.length} {members.length === 1 ? "person" : "people"} · {accountCount}{" "}
+        {accountCount === 1 ? "sign-in" : "sign-ins"} · {fingerprintCount}{" "}
+        {fingerprintCount === 1 ? "fingerprint" : "fingerprints"} · {phoneCount} {phoneCount === 1 ? "phone" : "phones"}
         {doors.some((door) => !door.online) &&
           " · Offline doors pick up changes when they reconnect; adding a fingerprint needs that door online"}
       </p>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative sm:max-w-xs sm:flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name or username"
+            aria-label="Search people"
+            className="h-9 rounded-[12px] pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 font-mono text-[10px] font-medium tracking-[.12em] uppercase transition-colors",
+                filter === key
+                  ? "border-transparent bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label} · {counts[key]}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {notice && (
         <p
@@ -117,16 +219,20 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {members.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-[18px] border border-dashed border-border p-10 text-center">
           <Users className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {loading ? "Loading people…" : "No one added yet. Add a person, then register their fingerprint."}
+            {loading
+              ? "Loading people…"
+              : members.length === 0
+                ? "No one added yet. Add a person and give them a sign-in, a fingerprint or a phone."
+                : "No one matches this search."}
           </p>
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {members.map((member) => (
+          {visible.map((member) => (
             <MemberCard
               key={member.id}
               member={member}
@@ -155,6 +261,9 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
               onSetUpPhone={() => setDialog({ kind: "phone-invite", member })}
               onDeletePhone={(phone) => setDialog({ kind: "delete-phone", member, phone })}
               onDelete={() => setDialog({ kind: "delete-member", member })}
+              onManageAccount={() => setDialog({ kind: "account", member })}
+              onRemoveAccount={() => setDialog({ kind: "remove-account", member })}
+              onHistory={() => setDialog({ kind: "history", member })}
             />
           ))}
         </div>
@@ -164,12 +273,36 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
         <AddMemberDialog
           onClose={closeDialog}
           onCreated={(member) => {
-            setNotice({ tone: "success", text: `${member.name} added — now register their fingerprint` });
+            setNotice({
+              tone: "success",
+              text: member.username
+                ? `${member.name} added — they can sign in as ${member.username}`
+                : `${member.name} added`,
+            });
             setDialog(null);
             void reload();
           }}
         />
       )}
+
+      {dialog?.kind === "account" && (
+        <AccountDialog
+          member={members.find((m) => m.id === dialog.member.id) ?? dialog.member}
+          onClose={closeDialog}
+          onSaved={(saved, passwordChanged) => {
+            setNotice({
+              tone: "success",
+              text: passwordChanged
+                ? `${saved.name}'s account saved with the new password`
+                : `${saved.name}'s account saved`,
+            });
+            setDialog(null);
+            void reload();
+          }}
+        />
+      )}
+
+      {dialog?.kind === "history" && <MemberHistoryDialog member={dialog.member} onClose={closeDialog} />}
 
       {dialog?.kind === "enroll" && (
         <EnrollFingerprintDialog
@@ -185,7 +318,17 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       {dialog?.kind === "delete-member" && (
         <ConfirmDialog
           title={`Delete ${dialog.member.name}?`}
-          detail="Their PIN stops working and their fingerprints are wiped from the sensor."
+          detail="Their sign-in stops working and their fingerprints are wiped from the sensors. Their past entries stay in the log."
+          busy={deleting}
+          onCancel={closeDialog}
+          onConfirmed={() => void confirmDelete()}
+        />
+      )}
+
+      {dialog?.kind === "remove-account" && (
+        <ConfirmDialog
+          title={`Remove ${dialog.member.name}'s sign-in?`}
+          detail="They can no longer sign in on the account page. Their fingerprints and phones keep working."
           busy={deleting}
           onCancel={closeDialog}
           onConfirmed={() => void confirmDelete()}

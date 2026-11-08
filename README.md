@@ -46,8 +46,21 @@ Management Office, …), managed in the admin dashboard's **Doors** tab.
   - `/` — the **keypad app**. No login. Type a PIN, or use the phone's own
     fingerprint / face (set up once per phone with your PIN). It never shows
     who came in. Wrong PINs are limited to 8 a minute per address.
-  - `/admin` — the **admin dashboard** (login). People, PINs, door-sensor
-    fingerprints, phones, and the activity log. There is no unlock button.
+  - `/admin` — the **admin dashboard** (login). Tabs: **Overview** (today's
+    numbers, 14-day chart, busiest hours, top people, how people get in, door
+    states with PIN rule and open hours, setup check), **Doors** (PIN, open
+    hours, "PIN required for account unlock", controller), **People**
+    (accounts with username + password, door access, door-sensor fingerprints,
+    phones, per-person history, search and filters) and **Log** (who used the
+    doors: search, filter by person / door / method / time, CSV export).
+    There is no unlock button on the admin dashboard.
+  - `/account` — a **person's own sign-in** (username + password made by the
+    admin). Shows the doors they may open with each door's open hours and
+    whether it needs the PIN, plus their own recent activity. Pressing
+    **Unlock** opens the door at once when the door's *PIN required* switch is
+    off, or asks for the door PIN when it is on (the default). Every sign-in,
+    failed sign-in and unlock is written to the log under their name. Their
+    token only works for `/api/member/*`, never for admin endpoints.
 - Device endpoints use the `X-Device-Key` header (backend `Device:ApiKey`),
   the admin endpoints use a normal login.
 - Phone fingerprint needs HTTPS (localhost is fine for testing). The deployed

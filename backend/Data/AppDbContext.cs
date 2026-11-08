@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(d => d.KeyHash).IsUnique();
             entity.Property(d => d.PinSalt).HasMaxLength(32);
             entity.Property(d => d.PinHash).HasMaxLength(64);
+            entity.Property(d => d.PinRequired).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Member>(entity =>
@@ -39,6 +40,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(m => m.Id);
             entity.Property(m => m.Name).IsRequired().HasMaxLength(64);
             entity.Property(m => m.Enabled).HasDefaultValue(true);
+            entity.Property(m => m.Username).HasMaxLength(32);
+            entity.Property(m => m.PasswordHint).HasMaxLength(64);
+            entity.HasIndex(m => m.Username).IsUnique();
         });
 
         modelBuilder.Entity<MemberDoor>(entity =>

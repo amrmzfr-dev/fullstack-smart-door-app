@@ -6,7 +6,9 @@ export type AccessEventType =
   | "forced_open"
   | "left_open"
   | "door_opened"
-  | "door_closed";
+  | "door_closed"
+  | "sign_in"
+  | "sign_in_failed";
 
 export type AccessMethod =
   | "none"
@@ -15,7 +17,8 @@ export type AccessMethod =
   | "exit_button"
   | "remote"
   | "app_pin"
-  | "phone_fingerprint";
+  | "phone_fingerprint"
+  | "account";
 
 export type CommandType = "unlock" | "enroll_fingerprint" | "delete_fingerprint";
 
@@ -71,6 +74,9 @@ export interface Door {
   pinUpdatedAt: string | null;
   createdAt: string;
   schedule: DoorSchedule;
+  // On: a signed-in person types the PIN to open this door from their account.
+  // Off: they just press Unlock.
+  pinRequired: boolean;
 }
 
 // What goes into a door controller's secrets.h — shown once.
@@ -107,6 +113,11 @@ export interface Member {
   fingerprints: Fingerprint[];
   phones: PhoneKey[];
   createdAt: string;
+  // Sign-in for the /account page (null username = no account yet).
+  username: string | null;
+  passwordHint: string | null;
+  accountCreatedAt: string | null;
+  lastLoginAt: string | null;
 }
 
 export interface DeviceCommand {
@@ -174,4 +185,89 @@ export interface PhoneInvite {
 export interface PhoneInviteInfo {
   memberName: string;
   expiresAt: string;
+}
+
+// ---- Admin overview numbers ----
+
+export interface DayStat {
+  date: string;
+  granted: number;
+  denied: number;
+  alarms: number;
+}
+
+export interface MethodStat {
+  method: AccessMethod;
+  count: number;
+}
+
+export interface DoorStat {
+  doorId: string | null;
+  name: string;
+  granted: number;
+  denied: number;
+}
+
+export interface PersonStat {
+  memberId: string;
+  name: string;
+  count: number;
+  lastAt: string;
+}
+
+export interface HourStat {
+  hour: number;
+  count: number;
+}
+
+export interface Stats {
+  members: number;
+  membersEnabled: number;
+  membersWithAccount: number;
+  membersWithPhone: number;
+  membersWithFingerprint: number;
+  doors: number;
+  doorsOnline: number;
+  doorsPinRequired: number;
+  doorsWithOpenHours: number;
+  grantedToday: number;
+  deniedToday: number;
+  alarmsToday: number;
+  signInsToday: number;
+  activePeopleToday: number;
+  days: DayStat[];
+  methods: MethodStat[];
+  perDoor: DoorStat[];
+  topPeople: PersonStat[];
+  hours: HourStat[];
+}
+
+// ---- A person's own account (/account) ----
+
+export interface MemberLoginResponse {
+  token: string;
+  name: string;
+  username: string;
+}
+
+export interface MemberDoor {
+  id: string;
+  name: string;
+  online: boolean;
+  doorOpen: boolean | null;
+  locked: boolean | null;
+  pinRequired: boolean;
+  pinSet: boolean;
+  schedule: DoorSchedule;
+}
+
+export interface MemberProfile {
+  id: string;
+  name: string;
+  username: string;
+  passwordHint: string | null;
+  lastLoginAt: string | null;
+  phones: number;
+  fingerprints: number;
+  doors: MemberDoor[];
 }

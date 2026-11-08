@@ -8,7 +8,7 @@ namespace SmartDoor.Api.Services;
 public class AccessEventService(AppDbContext dbContext) : IAccessEventService
 {
     private const int MaxEventsPerBatch = 50;
-    private const int MaxListLimit = 500;
+    private const int MaxListLimit = 1000;
     private static readonly TimeSpan MaxEventAge = TimeSpan.FromDays(7);
 
     public async Task RecordDeviceEventsAsync(
@@ -74,6 +74,17 @@ public class AccessEventService(AppDbContext dbContext) : IAccessEventService
     public async Task<IReadOnlyList<AccessEvent>> ListAsync(int limit, CancellationToken cancellationToken) =>
         await dbContext.AccessEvents
             .AsNoTracking()
+            .OrderByDescending(e => e.OccurredAt)
+            .Take(Math.Clamp(limit, 1, MaxListLimit))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AccessEvent>> ListForMemberAsync(
+        Guid memberId,
+        int limit,
+        CancellationToken cancellationToken) =>
+        await dbContext.AccessEvents
+            .AsNoTracking()
+            .Where(e => e.MemberId == memberId)
             .OrderByDescending(e => e.OccurredAt)
             .Take(Math.Clamp(limit, 1, MaxListLimit))
             .ToListAsync(cancellationToken);

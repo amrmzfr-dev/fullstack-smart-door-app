@@ -8,6 +8,16 @@ public class Member
     public required string Name { get; set; }
     public bool Enabled { get; set; } = true;
 
+    // Optional web-app account: lets the person sign in on their phone and
+    // open the doors they are allowed on (see MemberPortalController). The
+    // password is only ever stored as a hash; PasswordHint is the on-screen
+    // reminder, e.g. "sh*******26".
+    public string? Username { get; set; }
+    public string? PasswordHash { get; set; }
+    public string? PasswordHint { get; set; }
+    public DateTimeOffset? AccountCreatedAt { get; set; }
+    public DateTimeOffset? LastLoginAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public List<Fingerprint> Fingerprints { get; set; } = [];
     public List<PhoneKey> PhoneKeys { get; set; } = [];

@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, DeviceCommand, Door, DoorSchedule, DoorSetup, Member, PhoneInvite } from "@/types";
+import type { AccessEvent, DeviceCommand, Door, DoorSchedule, DoorSetup, Member, PhoneInvite, Stats } from "@/types";
 
 // ---- Doors ----
 
@@ -41,10 +41,27 @@ export function setDoorSchedule(doorId: string, schedule: Pick<DoorSchedule, "en
   return apiPut<Door>(`/doors/${doorId}/schedule`, schedule);
 }
 
+// ---- PIN required (for people who sign in on their phone) ----
+
+export function setDoorPinRequired(doorId: string, pinRequired: boolean): Promise<Door> {
+  return apiPut<Door>(`/doors/${doorId}/security`, { pinRequired });
+}
+
 // ---- Log ----
 
-export function fetchEvents(limit = 200): Promise<AccessEvent[]> {
+export function fetchEvents(limit = 500): Promise<AccessEvent[]> {
   return apiGet<AccessEvent[]>(`/events?limit=${limit}`);
+}
+
+export function fetchMemberEvents(memberId: string, limit = 100): Promise<AccessEvent[]> {
+  return apiGet<AccessEvent[]>(`/members/${memberId}/events?limit=${limit}`);
+}
+
+// ---- Overview numbers ----
+
+export function fetchStats(): Promise<Stats> {
+  const offset = -new Date().getTimezoneOffset();
+  return apiGet<Stats>(`/stats?utcOffsetMinutes=${offset}`);
 }
 
 // ---- People ----
@@ -53,8 +70,17 @@ export function fetchMembers(): Promise<Member[]> {
   return apiGet<Member[]>("/members");
 }
 
-export function createMember(name: string): Promise<Member> {
-  return apiPost<Member>("/members", { name });
+export function createMember(name: string, username?: string, password?: string): Promise<Member> {
+  return apiPost<Member>("/members", { name, username, password });
+}
+
+// Create or change a person's sign-in. No password = keep the current one.
+export function setMemberAccount(id: string, username: string, password?: string): Promise<Member> {
+  return apiPut<Member>(`/members/${id}/account`, { username, password });
+}
+
+export function clearMemberAccount(id: string): Promise<Member> {
+  return apiDelete<Member>(`/members/${id}/account`);
 }
 
 export function updateMember(id: string, name: string, enabled: boolean): Promise<Member> {

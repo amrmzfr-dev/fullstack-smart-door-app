@@ -7,7 +7,13 @@ namespace SmartDoor.Api.Services;
 
 public class JwtTokenService(IConfiguration configuration) : IJwtTokenService
 {
-    public string GenerateToken(Guid userId, string username)
+    public string GenerateToken(Guid userId, string username) => Generate(userId, username, null);
+
+    public string GenerateMemberToken(Guid memberId, string username) => Generate(memberId, username, MemberRole);
+
+    public const string MemberRole = "member";
+
+    private string Generate(Guid userId, string username, string? role)
     {
         var key = configuration["Jwt:Key"]
             ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -17,12 +23,16 @@ public class JwtTokenService(IConfiguration configuration) : IJwtTokenService
         // or the browser's localStorage is cleared.
         var expiryMinutes = configuration.GetValue<int?>("Jwt:ExpiryMinutes") ?? 525600;
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.UniqueName, username),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+        if (role is not null)
+        {
+            claims.Add(new Claim("role", role));
+        }
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);

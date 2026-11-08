@@ -1,7 +1,30 @@
-import type { AccessEvent, AccessEventType } from "@/types";
+import type { AccessEvent, AccessEventType, AccessMethod } from "@/types";
 
 export type EventTone = "success" | "danger" | "muted";
-export type EventCategory = "access" | "alarm" | "door";
+export type EventCategory = "access" | "alarm" | "door" | "account";
+
+// Plain names for "how did they get in" (filters, tables, exports).
+export const METHOD_LABELS: Record<AccessMethod, string> = {
+  none: "Unknown",
+  keypad: "Door keypad",
+  fingerprint: "Door fingerprint",
+  exit_button: "Exit button",
+  remote: "Web app",
+  app_pin: "Keypad app (PIN)",
+  phone_fingerprint: "Phone fingerprint",
+  account: "Their account",
+};
+
+export const TYPE_LABELS: Record<AccessEventType, string> = {
+  granted: "Opened",
+  denied: "Denied",
+  forced_open: "Forced open",
+  left_open: "Left open",
+  door_opened: "Door opened",
+  door_closed: "Door closed",
+  sign_in: "Signed in",
+  sign_in_failed: "Failed sign-in",
+};
 
 export interface EventDescription {
   title: string;
@@ -44,6 +67,22 @@ export function describeEvent(event: AccessEvent): EventDescription {
       return { title: "Door opened", detail: "Door contact", badge: "Door", tone: "muted", category: "door" };
     case "door_closed":
       return { title: "Door closed", detail: "Door contact", badge: "Door", tone: "muted", category: "door" };
+    case "sign_in":
+      return {
+        title: event.memberName ?? event.username ?? "Someone",
+        detail: "Signed in to their account",
+        badge: "Sign-in",
+        tone: "muted",
+        category: "account",
+      };
+    case "sign_in_failed":
+      return {
+        title: event.memberName ?? event.username ?? "Unknown username",
+        detail: "Failed sign-in — wrong username or password",
+        badge: "Failed",
+        tone: "danger",
+        category: "account",
+      };
   }
 }
 
@@ -66,6 +105,8 @@ function describeGranted(event: AccessEvent): Pick<EventDescription, "title" | "
       return { title: "Door PIN", detail: "Opened with PIN on the app" };
     case "phone_fingerprint":
       return { title: event.memberName ?? "Someone", detail: "Opened with phone fingerprint" };
+    case "account":
+      return { title: event.memberName ?? "Someone", detail: "Opened from their account" };
     case "none":
       return { title: "Door unlocked", detail: "" };
   }
@@ -77,6 +118,9 @@ function describeDenied(event: AccessEvent): Pick<EventDescription, "title" | "d
   }
   if (event.method === "app_pin") {
     return { title: "Wrong PIN", detail: "App keypad" };
+  }
+  if (event.method === "account") {
+    return { title: event.memberName ?? "Someone", detail: "Wrong PIN in their account" };
   }
   if (event.method === "fingerprint") {
     if (event.memberName) {

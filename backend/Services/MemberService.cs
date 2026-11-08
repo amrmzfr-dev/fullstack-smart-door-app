@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SmartDoor.Api.Data;
 using SmartDoor.Api.Models;
@@ -9,6 +11,8 @@ public class MemberService(
     IDeviceCommandService commandService) : IMemberService
 {
     private const int MaxNameLength = 64;
+    private static readonly PasswordHasher<Member> PasswordHasher = new();
+    private static readonly Regex UsernamePattern = new("^[a-z0-9._-]{3,32}$", RegexOptions.Compiled);
 
     public async Task<IReadOnlyList<Member>> ListAsync(CancellationToken cancellationToken) =>
         await dbContext.Members
@@ -19,7 +23,11 @@ public class MemberService(
             .OrderBy(m => m.Name)
             .ToListAsync(cancellationToken);
 
-    public async Task<ServiceResult<Member>> CreateAsync(string name, CancellationToken cancellationToken)
+    public async Task<ServiceResult<Member>> CreateAsync(
+        string name,
+        string? username,
+        string? password,
+        CancellationToken cancellationToken)
     {
         var cleanName = CleanName(name);
         if (cleanName is null)
@@ -28,6 +36,16 @@ public class MemberService(
         }
 
         var member = new Member { Id = Guid.NewGuid(), Name = cleanName };
+
+        // A sign-in is optional when adding someone; fill in both parts or neither.
+        if (!string.IsNullOrWhiteSpace(username) || !string.IsNullOrEmpty(password))
+        {
+            var problem = await ApplyAccountAsync(member, username, password, cancellationToken);
+            if (problem is not null)
+            {
+                return ServiceResult<Member>.Invalid(problem);
+            }
+        }
 
         // New people may open every door to start with; the admin switches
         // doors off per person.
@@ -58,6 +76,45 @@ public class MemberService(
 
         member.Name = cleanName;
         member.Enabled = enabled;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Member>.Ok(member);
+    }
+
+    public async Task<ServiceResult<Member>> SetAccountAsync(
+        Guid id,
+        string username,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        var member = await FindAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        var problem = await ApplyAccountAsync(member, username, password, cancellationToken);
+        if (problem is not null)
+        {
+            return ServiceResult<Member>.Invalid(problem);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Member>.Ok(member);
+    }
+
+    public async Task<ServiceResult<Member>> ClearAccountAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var member = await FindAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        member.Username = null;
+        member.PasswordHash = null;
+        member.PasswordHint = null;
+        member.AccountCreatedAt = null;
+        member.LastLoginAt = null;
         await dbContext.SaveChangesAsync(cancellationToken);
         return ServiceResult<Member>.Ok(member);
     }
@@ -115,6 +172,51 @@ public class MemberService(
         dbContext.Members.Remove(member);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ServiceResult<bool>.Ok(true);
+    }
+
+    // Returns what is wrong, or null when the username / password were applied.
+    private async Task<string?> ApplyAccountAsync(
+        Member member,
+        string? username,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        var cleanUsername = username?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(cleanUsername) || !UsernamePattern.IsMatch(cleanUsername))
+        {
+            return "Username needs 3 to 32 characters: letters, numbers, dot, dash or underscore.";
+        }
+
+        var taken = await dbContext.Members.AnyAsync(
+            m => m.Username == cleanUsername && m.Id != member.Id,
+            cancellationToken);
+        if (taken)
+        {
+            return "That username is already taken.";
+        }
+
+        if (string.IsNullOrEmpty(password))
+        {
+            if (member.PasswordHash is null)
+            {
+                return "Choose a password for this account.";
+            }
+        }
+        else
+        {
+            var problem = PasswordHintBuilder.Check(password);
+            if (problem is not null)
+            {
+                return problem.Replace("new password", "password");
+            }
+
+            member.PasswordHash = PasswordHasher.HashPassword(member, password);
+            member.PasswordHint = PasswordHintBuilder.Build(password);
+        }
+
+        member.Username = cleanUsername;
+        member.AccountCreatedAt ??= DateTimeOffset.UtcNow;
+        return null;
     }
 
     private Task<Member?> FindAsync(Guid id, CancellationToken cancellationToken) =>

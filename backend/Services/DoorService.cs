@@ -85,6 +85,19 @@ public class DoorService(AppDbContext dbContext) : IDoorService
         return ServiceResult<Door>.Ok(door);
     }
 
+    public async Task<ServiceResult<Door>> UpdateSecurityAsync(Guid id, bool pinRequired, CancellationToken cancellationToken)
+    {
+        var door = await dbContext.Doors.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (door is null)
+        {
+            return ServiceResult<Door>.NotFound("Door not found.");
+        }
+
+        door.PinRequired = pinRequired;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Door>.Ok(door);
+    }
+
     public async Task<ServiceResult<CreatedDoor>> ResetKeyAsync(Guid id, CancellationToken cancellationToken)
     {
         var door = await dbContext.Doors.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);

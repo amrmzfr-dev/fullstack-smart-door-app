@@ -9,6 +9,7 @@ public sealed record RenameDoorRequest(string Name);
 // Weekly open hours. From / Until are "HH:mm" in the door's local time; Days
 // are 0 = Monday ... 6 = Sunday.
 public sealed record DoorSchedule(bool Enabled, string From, string Until, IReadOnlyList<int> Days, int UtcOffsetMinutes);
+public sealed record UpdateDoorSecurityRequest(bool PinRequired);
 public sealed record UpdateDoorScheduleRequest(bool Enabled, string From, string Until, IReadOnlyList<int> Days);
 
 // Admin view of a door: live state (null while offline / never seen) + PIN
@@ -28,7 +29,8 @@ public sealed record DoorResponse(
     bool PinSet,
     DateTimeOffset? PinUpdatedAt,
     DateTimeOffset CreatedAt,
-    DoorSchedule Schedule)
+    DoorSchedule Schedule,
+    bool PinRequired)
 {
     public static DoorResponse From(Door door, DoorStatusSnapshot? snapshot, bool online) =>
         new(
@@ -46,7 +48,8 @@ public sealed record DoorResponse(
             door.PinHash is not null,
             door.PinUpdatedAt,
             door.CreatedAt,
-            DoorScheduleRules.ToDto(door));
+            DoorScheduleRules.ToDto(door),
+            door.PinRequired);
 }
 
 // What goes into a door controller's secrets.h. Shown once, when the door is
