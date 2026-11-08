@@ -13,9 +13,11 @@ export class HttpError extends Error {
   }
 }
 
-// The /account page has its own sign-in; everything else is the admin's.
+// The person pages (/ and /account) use the person's own sign-in; everything
+// else is the admin's.
 function onAccountPage(): boolean {
-  return window.location.pathname.startsWith("/account");
+  const path = window.location.pathname;
+  return path === "/" || path.startsWith("/account");
 }
 
 function activeToken(): string | null {
