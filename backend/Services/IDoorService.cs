@@ -14,6 +14,7 @@ public interface IDoorService
     Task<ServiceResult<Door>> RenameAsync(Guid id, string name, CancellationToken cancellationToken);
     Task<ServiceResult<Door>> UpdateScheduleAsync(Guid id, UpdateDoorScheduleRequest request, CancellationToken cancellationToken);
     Task<ServiceResult<Door>> UpdateSecurityAsync(Guid id, bool pinRequired, CancellationToken cancellationToken);
+    Task<ServiceResult<Door>> UpdateGeofenceAsync(Guid id, UpdateDoorGeofenceRequest request, CancellationToken cancellationToken);
     Task<ServiceResult<CreatedDoor>> ResetKeyAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken);
 

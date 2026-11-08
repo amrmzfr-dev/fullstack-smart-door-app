@@ -117,7 +117,8 @@ public class MemberPortalController(
                 snapshot?.Locked,
                 door.PinRequired,
                 door.PinHash is not null,
-                DoorScheduleRules.ToDto(door)));
+                DoorScheduleRules.ToDto(door),
+                door.GeofenceEnabled));
         }
 
         var phones = await dbContext.PhoneKeys.CountAsync(k => k.MemberId == member.Id, cancellationToken);
@@ -184,7 +185,10 @@ public class MemberPortalController(
             return Unauthorized();
         }
 
-        var result = await doorAccessService.UnlockForAccountAsync(request.DoorId, member, request.Pin, cancellationToken);
+        var location = request is { Latitude: double lat, Longitude: double lon }
+            ? new GeoPoint(lat, lon, request.AccuracyMeters)
+            : null;
+        var result = await doorAccessService.UnlockForAccountAsync(request.DoorId, member, request.Pin, location, cancellationToken);
         return this.ToActionResult(result, command => Accepted(UnlockProgressResponse.From(command)));
     }
 

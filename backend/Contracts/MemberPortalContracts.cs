@@ -7,7 +7,14 @@ public sealed record MemberLoginResponse(string Token, string Name, string Usern
 
 public sealed record MemberChangePasswordRequest(string CurrentPassword, string NewPassword);
 
-public sealed record MemberUnlockRequest(Guid DoorId, string? Pin);
+// Latitude / Longitude / AccuracyMeters: where the phone is, needed when the
+// door has a geofence.
+public sealed record MemberUnlockRequest(
+    Guid DoorId,
+    string? Pin,
+    double? Latitude = null,
+    double? Longitude = null,
+    double? AccuracyMeters = null);
 
 // A door this person may open, with what the page needs to show it.
 public sealed record MemberDoorResponse(
@@ -18,7 +25,8 @@ public sealed record MemberDoorResponse(
     bool? Locked,
     bool PinRequired,
     bool PinSet,
-    DoorSchedule Schedule);
+    DoorSchedule Schedule,
+    bool GeofenceEnabled);
 
 public sealed record MemberProfileResponse(
     Guid Id,

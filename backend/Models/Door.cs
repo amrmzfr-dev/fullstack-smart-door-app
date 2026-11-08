@@ -27,6 +27,14 @@ public class Door
     // public keypad app always use the PIN.)
     public bool PinRequired { get; set; } = true;
 
+    // Geofence: while on, a signed-in person can only unlock from their phone
+    // when the phone is inside this circle (centre + radius in metres), so a
+    // stray tap from home or the car park can't open the door.
+    public bool GeofenceEnabled { get; set; }
+    public double? GeofenceLatitude { get; set; }
+    public double? GeofenceLongitude { get; set; }
+    public int GeofenceRadiusMeters { get; set; } = 100;
+
     // Weekly "open hours": while the schedule is on, the door stays unlocked
     // between From and Until on the chosen days, then locks and needs a PIN /
     // fingerprint / phone again. The controller keeps the clock itself (NTP),

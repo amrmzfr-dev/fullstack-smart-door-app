@@ -126,7 +126,7 @@ function AccountHome({
     async (door: MemberDoor, pin?: string): Promise<string | null> => {
       setRequestError(null);
       try {
-        const started = await unlockMyDoor(door.id, pin);
+        const started = await unlockMyDoor(door, pin);
         setActiveDoorId(door.id);
         track(started);
         return null;

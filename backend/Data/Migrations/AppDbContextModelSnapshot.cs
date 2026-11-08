@@ -142,6 +142,22 @@ namespace SmartDoor.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("GeofenceEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<double?>("GeofenceLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("GeofenceLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("GeofenceRadiusMeters")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(100);
+
                     b.Property<string>("KeyHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");

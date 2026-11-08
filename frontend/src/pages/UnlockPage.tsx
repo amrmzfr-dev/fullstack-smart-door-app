@@ -118,7 +118,7 @@ function UnlockHome({
     async (target: MemberDoor, pin?: string): Promise<string | null> => {
       setRequestError(null);
       try {
-        track(await unlockMyDoor(target.id, pin));
+        track(await unlockMyDoor(target, pin));
         return null;
       } catch (err) {
         const text = errorMessage(err, "Couldn't reach the door. Try again.");

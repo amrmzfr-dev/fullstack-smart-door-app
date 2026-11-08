@@ -98,6 +98,40 @@ public class DoorService(AppDbContext dbContext) : IDoorService
         return ServiceResult<Door>.Ok(door);
     }
 
+    public async Task<ServiceResult<Door>> UpdateGeofenceAsync(
+        Guid id,
+        UpdateDoorGeofenceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var door = await dbContext.Doors.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (door is null)
+        {
+            return ServiceResult<Door>.NotFound("Door not found.");
+        }
+
+        if (request.RadiusMeters is < 20 or > 2000)
+        {
+            return ServiceResult<Door>.Invalid("The distance must be between 20 and 2000 metres.");
+        }
+
+        var hasCentre = request.Latitude is double lat && request.Longitude is double lon && GeoMath.IsValid(lat, lon);
+        if (request.Enabled && !hasCentre)
+        {
+            return ServiceResult<Door>.Invalid("Set the door's location first.");
+        }
+
+        door.GeofenceEnabled = request.Enabled;
+        if (hasCentre)
+        {
+            door.GeofenceLatitude = request.Latitude;
+            door.GeofenceLongitude = request.Longitude;
+        }
+
+        door.GeofenceRadiusMeters = request.RadiusMeters;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Door>.Ok(door);
+    }
+
     public async Task<ServiceResult<CreatedDoor>> ResetKeyAsync(Guid id, CancellationToken cancellationToken)
     {
         var door = await dbContext.Doors.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);

@@ -21,6 +21,7 @@ public interface IDoorAccessService
         Guid doorId,
         Member member,
         string? pin,
+        GeoPoint? location,
         CancellationToken cancellationToken);
 
     Task<ServiceResult<DeviceCommand>> GetUnlockAsync(Guid id, CancellationToken cancellationToken);

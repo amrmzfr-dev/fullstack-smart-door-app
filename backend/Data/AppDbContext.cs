@@ -33,6 +33,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(d => d.PinSalt).HasMaxLength(32);
             entity.Property(d => d.PinHash).HasMaxLength(64);
             entity.Property(d => d.PinRequired).HasDefaultValue(true);
+            entity.Property(d => d.GeofenceEnabled).HasDefaultValue(false);
+            entity.Property(d => d.GeofenceRadiusMeters).HasDefaultValue(100);
         });
 
         modelBuilder.Entity<Member>(entity =>

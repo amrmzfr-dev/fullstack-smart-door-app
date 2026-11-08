@@ -77,6 +77,15 @@ export interface Door {
   // On: a signed-in person types the PIN to open this door from their account.
   // Off: they just press Unlock.
   pinRequired: boolean;
+  geofence: DoorGeofence;
+}
+
+// The circle around a door a phone must be inside to unlock it from an account.
+export interface DoorGeofence {
+  enabled: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  radiusMeters: number;
 }
 
 // What goes into a door controller's secrets.h — shown once.
@@ -259,6 +268,8 @@ export interface MemberDoor {
   pinRequired: boolean;
   pinSet: boolean;
   schedule: DoorSchedule;
+  // On: the phone's location is checked when unlocking.
+  geofenceEnabled: boolean;
 }
 
 export interface MemberProfile {

@@ -10,6 +10,14 @@ public sealed record RenameDoorRequest(string Name);
 // are 0 = Monday ... 6 = Sunday.
 public sealed record DoorSchedule(bool Enabled, string From, string Until, IReadOnlyList<int> Days, int UtcOffsetMinutes);
 public sealed record UpdateDoorSecurityRequest(bool PinRequired);
+
+// The circle (centre + radius in metres) a phone must be inside to unlock.
+public sealed record DoorGeofence(bool Enabled, double? Latitude, double? Longitude, int RadiusMeters)
+{
+    public static DoorGeofence From(Door door) =>
+        new(door.GeofenceEnabled, door.GeofenceLatitude, door.GeofenceLongitude, door.GeofenceRadiusMeters);
+}
+public sealed record UpdateDoorGeofenceRequest(bool Enabled, double? Latitude, double? Longitude, int RadiusMeters);
 public sealed record UpdateDoorScheduleRequest(bool Enabled, string From, string Until, IReadOnlyList<int> Days);
 
 // Admin view of a door: live state (null while offline / never seen) + PIN
@@ -30,7 +38,8 @@ public sealed record DoorResponse(
     DateTimeOffset? PinUpdatedAt,
     DateTimeOffset CreatedAt,
     DoorSchedule Schedule,
-    bool PinRequired)
+    bool PinRequired,
+    DoorGeofence Geofence)
 {
     public static DoorResponse From(Door door, DoorStatusSnapshot? snapshot, bool online) =>
         new(
@@ -49,7 +58,8 @@ public sealed record DoorResponse(
             door.PinUpdatedAt,
             door.CreatedAt,
             DoorScheduleRules.ToDto(door),
-            door.PinRequired);
+            door.PinRequired,
+            DoorGeofence.From(door));
 }
 
 // What goes into a door controller's secrets.h. Shown once, when the door is

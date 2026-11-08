@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, CommandStatus, MemberProfile, UnlockProgress } from "@/types";
+import { getPhoneLocation } from "@/lib/location";
+import type { AccessEvent, CommandStatus, MemberDoor, MemberProfile, UnlockProgress } from "@/types";
 
 // A signed-in person's own account (the /account page).
 
@@ -15,9 +16,21 @@ export function changeMyPassword(currentPassword: string, newPassword: string): 
   return apiPut<MemberProfile>("/member/password", { currentPassword, newPassword });
 }
 
-// pin is only needed when the door is set to require it.
-export function unlockMyDoor(doorId: string, pin?: string): Promise<UnlockProgress> {
-  return apiPost<UnlockProgress>("/member/unlock", { doorId, pin });
+// pin is only needed when the door is set to require it. When the door has a
+// geofence, the phone's location is read first and sent along (the server
+// checks it).
+export async function unlockMyDoor(
+  door: Pick<MemberDoor, "id" | "geofenceEnabled">,
+  pin?: string,
+): Promise<UnlockProgress> {
+  const location = door.geofenceEnabled ? await getPhoneLocation() : null;
+  return apiPost<UnlockProgress>("/member/unlock", {
+    doorId: door.id,
+    pin,
+    latitude: location?.latitude,
+    longitude: location?.longitude,
+    accuracyMeters: location?.accuracyMeters,
+  });
 }
 
 // Held by the server until the status moves on (same as the keypad app).

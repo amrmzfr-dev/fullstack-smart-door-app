@@ -87,6 +87,7 @@ public class DoorAccessService(
         Guid doorId,
         Member member,
         string? pin,
+        GeoPoint? location,
         CancellationToken cancellationToken)
     {
         var door = await dbContext.Doors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == doorId, cancellationToken);
@@ -111,6 +112,35 @@ public class DoorAccessService(
         if (!await doorStatusStore.IsOnlineAsync(doorId))
         {
             return ServiceResult<DeviceCommand>.Conflict(DoorOffline);
+        }
+
+        // Geofence: the phone must be inside the circle around the door.
+        if (door is { GeofenceEnabled: true, GeofenceLatitude: double fenceLat, GeofenceLongitude: double fenceLon })
+        {
+            if (location is null || !GeoMath.IsValid(location.Latitude, location.Longitude))
+            {
+                return ServiceResult<DeviceCommand>.Invalid(
+                    "Turn on your phone's location to unlock this door.");
+            }
+
+            var distance = GeoMath.DistanceMeters(location.Latitude, location.Longitude, fenceLat, fenceLon);
+            var benefit = Math.Clamp(location.AccuracyMeters ?? 0, 0, GeoMath.MaxAccuracyBenefitMeters);
+            if (distance - benefit > door.GeofenceRadiusMeters)
+            {
+                dbContext.AccessEvents.Add(new AccessEvent
+                {
+                    Id = Guid.NewGuid(),
+                    Type = AccessEventType.Denied,
+                    Method = AccessMethod.Account,
+                    MemberId = member.Id,
+                    MemberName = member.Name,
+                    DoorId = door.Id,
+                    DoorName = door.Name,
+                    OccurredAt = DateTimeOffset.UtcNow,
+                });
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult<DeviceCommand>.Invalid("You're too far from the door to unlock it.");
+            }
         }
 
         if (door.PinRequired)

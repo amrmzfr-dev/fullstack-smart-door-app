@@ -1,4 +1,5 @@
 import { clearSession, getToken } from "@/lib/auth";
+import { LocationError } from "@/lib/location";
 import { clearMemberSession, getMemberToken } from "@/lib/memberAuth";
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:5125/api";
@@ -93,6 +94,9 @@ export function apiDelete<T = void>(path: string): Promise<T> {
 
 export function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof HttpError && error.status !== 401 && error.status < 500) {
+    return error.message;
+  }
+  if (error instanceof LocationError) {
     return error.message;
   }
   return fallback;

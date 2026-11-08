@@ -15,6 +15,7 @@ import {
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DoorNameDialog } from "@/components/DoorNameDialog";
+import { DoorGeofenceCard } from "@/components/DoorGeofenceCard";
 import { DoorScheduleCard } from "@/components/DoorScheduleCard";
 import { DoorSetupDialog } from "@/components/DoorSetupDialog";
 import { PinPadDialog } from "@/components/PinPadDialog";
@@ -194,6 +195,8 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
           }
         />
       </div>
+
+      <DoorGeofenceCard door={door} onChanged={onChanged} onNotice={onNotice} />
 
       <DoorScheduleCard door={door} onChanged={onChanged} onNotice={onNotice} />
 

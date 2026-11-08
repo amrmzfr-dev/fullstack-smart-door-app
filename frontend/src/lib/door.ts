@@ -1,5 +1,5 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import type { AccessEvent, DeviceCommand, Door, DoorSchedule, DoorSetup, Member, PhoneInvite, Stats } from "@/types";
+import type { AccessEvent, DeviceCommand, Door, DoorGeofence, DoorSchedule, DoorSetup, Member, PhoneInvite, Stats } from "@/types";
 
 // ---- Doors ----
 
@@ -45,6 +45,12 @@ export function setDoorSchedule(doorId: string, schedule: Pick<DoorSchedule, "en
 
 export function setDoorPinRequired(doorId: string, pinRequired: boolean): Promise<Door> {
   return apiPut<Door>(`/doors/${doorId}/security`, { pinRequired });
+}
+
+// ---- Geofence (phones must be near the door to unlock) ----
+
+export function setDoorGeofence(doorId: string, geofence: DoorGeofence): Promise<Door> {
+  return apiPut<Door>(`/doors/${doorId}/geofence`, geofence);
 }
 
 // ---- Log ----
