@@ -231,7 +231,7 @@ function UnlockHome({
                 {opening
                   ? "Opening…"
                   : workingHours && door
-                    ? `Door stays unlocked until ${formatClock(door.schedule.until)}`
+                    ? `Door remains unlocked until ${formatClock(door.schedule.until)}`
                     : isOpen && !offline
                     ? "Push the door within 5 seconds"
                     : offline
@@ -249,7 +249,7 @@ function UnlockHome({
                   className="flex h-16 w-full items-center justify-center gap-2 rounded-[18px] border border-success/40 bg-success/15 text-lg font-extrabold text-success uppercase"
                 >
                   <Check className="size-5" strokeWidth={3} />
-                  Open until {formatClock(door.schedule.until)}
+                  Unlocked until {formatClock(door.schedule.until)}
                 </div>
               ) : isOpen && !opening && !offline ? (
                 // Already open: no second press needed, so the button turns
