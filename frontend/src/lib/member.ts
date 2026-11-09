@@ -8,6 +8,11 @@ export function fetchMyProfile(): Promise<MemberProfile> {
   return apiGet<MemberProfile>("/member/me");
 }
 
+// Only for a person given admin access (403 otherwise).
+export function fetchMyAdminToken(): Promise<{ token: string; username: string }> {
+  return apiGet<{ token: string; username: string }>("/member/admin-token");
+}
+
 export function fetchMyActivity(limit = 40): Promise<AccessEvent[]> {
   return apiGet<AccessEvent[]>(`/member/activity?limit=${limit}`);
 }

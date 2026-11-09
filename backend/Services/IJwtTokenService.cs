@@ -6,4 +6,7 @@ public interface IJwtTokenService
 
     // A person's own account (role "member"): can only use the member portal.
     string GenerateMemberToken(Guid memberId, string username);
+
+    // Full admin access for a person the admin trusted; expires after a day.
+    string GenerateAdminTokenForMember(Guid memberId, string username);
 }

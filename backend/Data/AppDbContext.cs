@@ -43,6 +43,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(m => m.Name).IsRequired().HasMaxLength(64);
             entity.Property(m => m.Enabled).HasDefaultValue(true);
             entity.Property(m => m.Username).HasMaxLength(32);
+            entity.Property(m => m.IsAdmin).HasDefaultValue(false);
             entity.Property(m => m.PasswordHint).HasMaxLength(64);
             entity.HasIndex(m => m.Username).IsUnique();
         });

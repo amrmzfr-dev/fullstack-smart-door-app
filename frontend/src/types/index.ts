@@ -127,6 +127,8 @@ export interface Member {
   passwordHint: string | null;
   accountCreatedAt: string | null;
   lastLoginAt: string | null;
+  // Can also open the admin panel from their account page.
+  isAdmin: boolean;
 }
 
 export interface DeviceCommand {
@@ -278,6 +280,7 @@ export interface MemberProfile {
   username: string;
   passwordHint: string | null;
   lastLoginAt: string | null;
+  isAdmin: boolean;
   phones: number;
   fingerprints: number;
   doors: MemberDoor[];

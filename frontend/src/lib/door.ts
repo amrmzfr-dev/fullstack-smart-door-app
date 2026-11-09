@@ -85,6 +85,10 @@ export function setMemberAccount(id: string, username: string, password?: string
   return apiPut<Member>(`/members/${id}/account`, { username, password });
 }
 
+export function setMemberAdmin(id: string, isAdmin: boolean): Promise<Member> {
+  return apiPut<Member>(`/members/${id}/admin`, { isAdmin });
+}
+
 export function clearMemberAccount(id: string): Promise<Member> {
   return apiDelete<Member>(`/members/${id}/account`);
 }

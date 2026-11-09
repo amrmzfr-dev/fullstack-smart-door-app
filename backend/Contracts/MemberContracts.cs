@@ -4,6 +4,7 @@ namespace SmartDoor.Api.Contracts;
 
 public sealed record CreateMemberRequest(string Name, string? Username = null, string? Password = null);
 public sealed record SetMemberAccountRequest(string Username, string? Password);
+public sealed record SetMemberAdminRequest(bool IsAdmin);
 public sealed record UpdateMemberRequest(string Name, bool Enabled);
 public sealed record SetMemberDoorsRequest(IReadOnlyList<Guid> DoorIds);
 
@@ -24,7 +25,8 @@ public sealed record MemberResponse(
     string? Username,
     string? PasswordHint,
     DateTimeOffset? AccountCreatedAt,
-    DateTimeOffset? LastLoginAt)
+    DateTimeOffset? LastLoginAt,
+    bool IsAdmin)
 {
     public static MemberResponse From(Member member) =>
         new(
@@ -44,5 +46,6 @@ public sealed record MemberResponse(
             member.Username,
             member.PasswordHint,
             member.AccountCreatedAt,
-            member.LastLoginAt);
+            member.LastLoginAt,
+            member.IsAdmin);
 }

@@ -18,6 +18,7 @@ import {
   deleteFingerprint,
   deleteMember,
   deletePhoneKey,
+  setMemberAdmin,
   setMemberDoors,
   updateMember,
 } from "@/lib/door";
@@ -263,6 +264,13 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
               onDelete={() => setDialog({ kind: "delete-member", member })}
               onManageAccount={() => setDialog({ kind: "account", member })}
               onRemoveAccount={() => setDialog({ kind: "remove-account", member })}
+              onToggleAdmin={(isAdmin) =>
+                void runForMember(
+                  member,
+                  () => setMemberAdmin(member.id, isAdmin),
+                  isAdmin ? `${member.name} can now use the admin panel` : `${member.name} no longer has the admin panel`,
+                )
+              }
               onHistory={() => setDialog({ kind: "history", member })}
             />
           ))}

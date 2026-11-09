@@ -16,6 +16,10 @@ public class Member
     public string? PasswordHash { get; set; }
     public string? PasswordHint { get; set; }
     public DateTimeOffset? AccountCreatedAt { get; set; }
+
+    // On: this person can also open the admin panel from their account page
+    // (the bottom bar under Unlock). Only an admin can switch it on.
+    public bool IsAdmin { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

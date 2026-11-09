@@ -19,6 +19,7 @@ interface MemberCardProps {
   onDelete: () => void;
   onManageAccount: () => void;
   onRemoveAccount: () => void;
+  onToggleAdmin: (isAdmin: boolean) => void;
   onHistory: () => void;
 }
 
@@ -35,6 +36,7 @@ export function MemberCard({
   onDelete,
   onManageAccount,
   onRemoveAccount,
+  onToggleAdmin,
   onHistory,
 }: MemberCardProps) {
   const allowedDoors = doors.filter((door) => member.doorIds.includes(door.id));
@@ -93,6 +95,24 @@ export function MemberCard({
             <Button variant="ghost" size="xs" disabled={busy} onClick={onRemoveAccount}>
               Remove sign-in
             </Button>
+          </div>
+        )}
+        {member.username !== null && (
+          <div className="flex items-center gap-3 pl-7">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">Admin panel</p>
+              <p className="text-xs text-muted-foreground">
+                {member.isAdmin
+                  ? "On — they see the admin bar under Unlock on their phone."
+                  : "Off — they can only unlock doors."}
+              </p>
+            </div>
+            <Switch
+              checked={member.isAdmin}
+              disabled={busy}
+              label={`Let ${member.name} use the admin panel`}
+              onChange={onToggleAdmin}
+            />
           </div>
         )}
       </div>

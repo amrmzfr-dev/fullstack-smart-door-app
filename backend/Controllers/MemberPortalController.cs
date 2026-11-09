@@ -130,9 +130,32 @@ public class MemberPortalController(
             member.Username!,
             member.PasswordHint,
             member.LastLoginAt,
+            member.IsAdmin,
             phones,
             fingerprints,
             responses));
+    }
+
+    // For a person the admin gave admin access: a fresh admin sign-in that lasts
+    // a day, so taking the access away stops working within a day (and the page
+    // asks again every hour). Everyone else gets 403.
+    [HttpGet("admin-token")]
+    public async Task<ActionResult<MemberAdminTokenResponse>> AdminTokenAsync(CancellationToken cancellationToken)
+    {
+        var member = await CurrentMemberAsync(cancellationToken);
+        if (member is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!member.IsAdmin)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "You don't have admin access.");
+        }
+
+        return Ok(new MemberAdminTokenResponse(
+            jwtTokenService.GenerateAdminTokenForMember(member.Id, member.Username!),
+            member.Username!));
     }
 
     [HttpPut("password")]

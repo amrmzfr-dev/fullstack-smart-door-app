@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronDown, DoorClosed, DoorOpen, KeyRound, LoaderCircle, Lock, LockOpen, LogOut, WifiOff } from "lucide-react";
 
+import { ADMIN_SECTIONS, AdminSections, type AdminSection } from "@/components/AdminSections";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
@@ -8,7 +9,8 @@ import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useNow } from "@/hooks/useNow";
 import { usePolling } from "@/hooks/usePolling";
 import { errorMessage } from "@/lib/api";
-import { fetchMyProfile, fetchMyUnlock, unlockMyDoor } from "@/lib/member";
+import { clearSession, setSession } from "@/lib/auth";
+import { fetchMyAdminToken, fetchMyProfile, fetchMyUnlock, unlockMyDoor } from "@/lib/member";
 import { formatClock, isInsideOpenHours } from "@/lib/schedule";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,8 @@ import type { MemberDoor, MemberProfile } from "@/types";
 
 const PROFILE_POLL_MS = 1500;
 const RESULT_SHOWN_MS = 5000;
+// The admin sign-in lasts a day; ask for a fresh one every hour.
+const ADMIN_TOKEN_REFRESH_MS = 3_600_000;
 const PICKED_DOOR_KEY = "smart-door-picked-door";
 
 function readPickedDoor(): string | null {
@@ -77,6 +81,9 @@ function UnlockHome({
   const [chooserOpen, setChooserOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  // "unlock" = this page; otherwise an admin page (only for people with admin access).
+  const [view, setView] = useState<"unlock" | AdminSection>("unlock");
+  const [adminReady, setAdminReady] = useState(false);
   const { command, track, reset } = useCommandTracker(fetchMyUnlock, { pollMs: 0 });
 
   const loadProfile = useCallback(async () => {
@@ -88,6 +95,28 @@ function UnlockHome({
     }
   }, []);
   usePolling(loadProfile, PROFILE_POLL_MS);
+
+  const isAdmin = profile?.isAdmin === true;
+  const refreshAdminToken = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const { token, username } = await fetchMyAdminToken();
+      setSession(token, username);
+      setAdminReady(true);
+    } catch {
+      // Keep whatever sign-in we had; the admin pages show the error.
+    }
+  }, [isAdmin]);
+  usePolling(refreshAdminToken, ADMIN_TOKEN_REFRESH_MS);
+
+  // Admin access taken away: drop the admin sign-in and go back to Unlock.
+  useEffect(() => {
+    if (profile !== null && !profile.isAdmin && adminReady) {
+      clearSession();
+      setAdminReady(false);
+      setView("unlock");
+    }
+  }, [profile, adminReady]);
 
   useEffect(() => {
     if (command === null || !isFinished(command.status)) return;
@@ -197,7 +226,13 @@ function UnlockHome({
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+      <main
+        className={cn(
+          "flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-6 pb-6",
+          view !== "unlock" && "hidden",
+          !isAdmin && "pb-[max(24px,env(safe-area-inset-bottom))]",
+        )}
+      >
         {profile === null ? (
           <p className="text-sm text-muted-foreground">{loadError ?? "Loading…"}</p>
         ) : door === null ? (
@@ -278,6 +313,49 @@ function UnlockHome({
           </>
         )}
       </main>
+
+      {isAdmin && view !== "unlock" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {adminReady ? (
+            <AdminSections section={view} onGo={setView} />
+          ) : (
+            <p className="p-6 text-center text-sm text-muted-foreground">Opening the admin panel…</p>
+          )}
+        </div>
+      )}
+
+      {/* Bottom bar under Unlock: only people the admin gave admin access ever see it. */}
+      {isAdmin && (
+        <nav className="flex-none border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
+          <div className="grid grid-cols-5">
+            <button
+              type="button"
+              onClick={() => setView("unlock")}
+              className={cn(
+                "flex flex-col items-center gap-1 py-2.5 font-mono text-[10px] tracking-[.12em] uppercase",
+                view === "unlock" ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <LockOpen className="size-5" />
+              Unlock
+            </button>
+            {ADMIN_SECTIONS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-2.5 font-mono text-[10px] tracking-[.12em] uppercase",
+                  view === key ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                <Icon className="size-5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
       {pinOpen && door && (
         <UnlockPinDialog

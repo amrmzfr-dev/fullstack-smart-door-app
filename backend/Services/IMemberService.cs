@@ -10,6 +10,7 @@ public interface IMemberService
     // Create the person's sign-in, or change its username / password (a null
     // password keeps the current one).
     Task<ServiceResult<Member>> SetAccountAsync(Guid id, string username, string? password, CancellationToken cancellationToken);
+    Task<ServiceResult<Member>> SetAdminAsync(Guid id, bool isAdmin, CancellationToken cancellationToken);
     Task<ServiceResult<Member>> ClearAccountAsync(Guid id, CancellationToken cancellationToken);
     Task<ServiceResult<Member>> UpdateAsync(Guid id, string name, bool enabled, CancellationToken cancellationToken);
     Task<ServiceResult<Member>> SetDoorsAsync(Guid id, IReadOnlyList<Guid> doorIds, CancellationToken cancellationToken);

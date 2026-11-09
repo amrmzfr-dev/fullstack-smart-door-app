@@ -45,6 +45,17 @@ public class MembersController(IMemberService memberService) : ControllerBase
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
 
+    // Let the person open the admin panel from their account page (or take it away).
+    [HttpPut("{id:guid}/admin")]
+    public async Task<ActionResult<MemberResponse>> SetAdminAsync(
+        Guid id,
+        [FromBody] SetMemberAdminRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await memberService.SetAdminAsync(id, request.IsAdmin, cancellationToken);
+        return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
+    }
+
     [HttpDelete("{id:guid}/account")]
     public async Task<ActionResult<MemberResponse>> ClearAccountAsync(Guid id, CancellationToken cancellationToken)
     {

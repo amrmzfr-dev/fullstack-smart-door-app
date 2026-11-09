@@ -5,6 +5,9 @@ namespace SmartDoor.Api.Contracts;
 public sealed record MemberLoginRequest(string Username, string Password);
 public sealed record MemberLoginResponse(string Token, string Name, string Username);
 
+// A short-lived admin sign-in for a person who was given admin access.
+public sealed record MemberAdminTokenResponse(string Token, string Username);
+
 public sealed record MemberChangePasswordRequest(string CurrentPassword, string NewPassword);
 
 // Latitude / Longitude / AccuracyMeters: where the phone is, needed when the
@@ -34,6 +37,7 @@ public sealed record MemberProfileResponse(
     string Username,
     string? PasswordHint,
     DateTimeOffset? LastLoginAt,
+    bool IsAdmin,
     int Phones,
     int Fingerprints,
     IReadOnlyList<MemberDoorResponse> Doors);

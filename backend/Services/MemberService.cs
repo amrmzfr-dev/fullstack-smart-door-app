@@ -102,6 +102,24 @@ public class MemberService(
         return ServiceResult<Member>.Ok(member);
     }
 
+    public async Task<ServiceResult<Member>> SetAdminAsync(Guid id, bool isAdmin, CancellationToken cancellationToken)
+    {
+        var member = await FindAsync(id, cancellationToken);
+        if (member is null)
+        {
+            return NotFound();
+        }
+
+        if (isAdmin && member.Username is null)
+        {
+            return ServiceResult<Member>.Invalid("Make a sign-in for this person first.");
+        }
+
+        member.IsAdmin = isAdmin;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ServiceResult<Member>.Ok(member);
+    }
+
     public async Task<ServiceResult<Member>> ClearAccountAsync(Guid id, CancellationToken cancellationToken)
     {
         var member = await FindAsync(id, cancellationToken);
@@ -111,6 +129,7 @@ public class MemberService(
         }
 
         member.Username = null;
+        member.IsAdmin = false;
         member.PasswordHash = null;
         member.PasswordHint = null;
         member.AccountCreatedAt = null;

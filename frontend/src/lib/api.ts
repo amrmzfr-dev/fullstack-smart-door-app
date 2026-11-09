@@ -14,19 +14,20 @@ export class HttpError extends Error {
   }
 }
 
-// The person pages (/ and /account) use the person's own sign-in; everything
-// else is the admin's.
-function onAccountPage(): boolean {
-  const path = window.location.pathname;
-  return path === "/" || path.startsWith("/account");
+// On "/" a person with admin access uses their own sign-in for /member/*
+// calls and an admin sign-in for everything else (the admin panel bar).
+function usesMemberToken(path: string): boolean {
+  const current = window.location.pathname;
+  if (current.startsWith("/account")) return true;
+  return current === "/" && path.startsWith("/member");
 }
 
-function activeToken(): string | null {
-  return onAccountPage() ? getMemberToken() : getToken();
+function activeToken(path: string): string | null {
+  return usesMemberToken(path) ? getMemberToken() : getToken();
 }
 
-function authHeaders(): Record<string, string> {
-  const token = activeToken();
+function authHeaders(path: string): Record<string, string> {
+  const token = activeToken(path);
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -47,7 +48,7 @@ function readErrorMessage(body: string, fallback: string): string {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", ...authHeaders() };
+  const headers: Record<string, string> = { Accept: "application/json", ...authHeaders(path) };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
@@ -59,8 +60,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
 
   if (!response.ok) {
-    if (response.status === 401 && activeToken() !== null) {
-      if (onAccountPage()) {
+    if (response.status === 401 && activeToken(path) !== null) {
+      if (usesMemberToken(path)) {
         clearMemberSession();
       } else {
         clearSession();
