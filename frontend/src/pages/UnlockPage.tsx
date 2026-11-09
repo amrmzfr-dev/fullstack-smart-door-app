@@ -5,9 +5,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
+import { useNow } from "@/hooks/useNow";
 import { usePolling } from "@/hooks/usePolling";
 import { errorMessage } from "@/lib/api";
 import { fetchMyProfile, fetchMyUnlock, unlockMyDoor } from "@/lib/member";
+import { formatClock, isInsideOpenHours } from "@/lib/schedule";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { UnlockPinDialog } from "@/pages/AccountPage";
@@ -68,6 +70,7 @@ function UnlockHome({
   theme: Theme;
   onToggleTheme: () => void;
 }) {
+  const now = useNow(15000);
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(readPickedDoor);
@@ -111,7 +114,11 @@ function UnlockHome({
   const unlocked = door?.online === true && door.locked === false;
   const isOpen = doorOpen || unlocked || unlockConfirmed;
 
-  const stateText = door === null ? "" : offline ? "Offline" : doorOpen ? "Door open" : isOpen ? "Unlocked" : "Locked";
+  // Unlocked because it is working hours (the door's weekly open hours), not
+  // because someone just pressed Unlock: nothing to press until it locks again.
+  const workingHours = door !== null && !offline && isOpen && !opening && isInsideOpenHours(door.schedule, now);
+
+  const stateText = door === null ? "" : offline ? "Offline" : workingHours ? "Working hours" : doorOpen ? "Door open" : isOpen ? "Unlocked" : "Locked";
   const blocked = door === null || offline || (door.pinRequired && !door.pinSet);
 
   const startUnlock = useCallback(
@@ -223,7 +230,9 @@ function UnlockHome({
               <p className="min-h-4 text-center text-xs text-muted-foreground">
                 {opening
                   ? "Opening…"
-                  : isOpen && !offline
+                  : workingHours && door
+                    ? `Door stays unlocked until ${formatClock(door.schedule.until)}`
+                    : isOpen && !offline
                     ? "Push the door within 5 seconds"
                     : offline
                       ? "This door is offline right now"
@@ -234,7 +243,15 @@ function UnlockHome({
             </div>
 
             <div className="w-full max-w-xs space-y-3">
-              {isOpen && !opening && !offline ? (
+              {workingHours && door ? (
+                <div
+                  role="status"
+                  className="flex h-16 w-full items-center justify-center gap-2 rounded-[18px] border border-success/40 bg-success/15 text-lg font-extrabold text-success uppercase"
+                >
+                  <Check className="size-5" strokeWidth={3} />
+                  Open until {formatClock(door.schedule.until)}
+                </div>
+              ) : isOpen && !opening && !offline ? (
                 // Already open: no second press needed, so the button turns
                 // into a calm "done" state instead of offering Unlock again.
                 <div
