@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, DoorClosed, DoorOpen, KeyRound, LoaderCircle, Lock, LockOpen, LogOut, WifiOff } from "lucide-react";
+import { Check, ChevronDown, DoorClosed, DoorOpen, KeyRound, LoaderCircle, Lock, LockOpen, LogOut, WifiOff } from "lucide-react";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -234,14 +234,26 @@ function UnlockHome({
             </div>
 
             <div className="w-full max-w-xs space-y-3">
-              <Button
-                className="h-16 w-full rounded-[18px] text-lg font-extrabold uppercase"
-                disabled={blocked || opening}
-                onClick={press}
-              >
-                {opening ? <LoaderCircle className="animate-spin" /> : door.pinRequired ? <KeyRound /> : <LockOpen />}
-                {opening ? "Opening…" : "Unlock"}
-              </Button>
+              {isOpen && !opening && !offline ? (
+                // Already open: no second press needed, so the button turns
+                // into a calm "done" state instead of offering Unlock again.
+                <div
+                  role="status"
+                  className="flex h-16 w-full items-center justify-center gap-2 rounded-[18px] border border-success/40 bg-success/15 text-lg font-extrabold text-success uppercase"
+                >
+                  <Check className="size-5" strokeWidth={3} />
+                  {doorOpen ? "Door is open" : "Door unlocked"}
+                </div>
+              ) : (
+                <Button
+                  className="h-16 w-full rounded-[18px] text-lg font-extrabold uppercase"
+                  disabled={blocked || opening}
+                  onClick={press}
+                >
+                  {opening ? <LoaderCircle className="animate-spin" /> : door.pinRequired ? <KeyRound /> : <LockOpen />}
+                  {opening ? "Opening…" : "Unlock"}
+                </Button>
+              )}
               {failed && <p className="text-center text-xs text-destructive">{command?.message ?? "The door didn't respond."}</p>}
               {requestError && <p className="text-center text-xs text-destructive">{requestError}</p>}
               {loadError && <p className="text-center text-xs text-destructive">{loadError}</p>}
