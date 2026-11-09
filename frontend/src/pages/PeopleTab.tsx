@@ -34,6 +34,7 @@ type Dialog =
   | { kind: "account"; member: Member }
   | { kind: "history"; member: Member }
   | { kind: "remove-account"; member: Member }
+  | { kind: "set-admin"; member: Member; isAdmin: boolean }
   | { kind: "delete-member"; member: Member }
   | { kind: "delete-fingerprint"; member: Member; fingerprint: Fingerprint }
   | { kind: "delete-phone"; member: Member; phone: PhoneKey };
@@ -86,6 +87,27 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       setNotice({ tone: "error", text: errorMessage(err, "Something went wrong. Try again.") });
     } finally {
       setBusyId(null);
+      await reload();
+    }
+  };
+
+  const confirmSetAdmin = async () => {
+    const target = dialog;
+    if (target === null || target.kind !== "set-admin") return;
+    setDeleting(true);
+    try {
+      await setMemberAdmin(target.member.id, target.isAdmin);
+      setNotice({
+        tone: "success",
+        text: target.isAdmin
+          ? `${target.member.name} can now use the admin panel`
+          : `${target.member.name} no longer has the admin panel`,
+      });
+      setDialog(null);
+    } catch (err) {
+      setNotice({ tone: "error", text: errorMessage(err, "Couldn't change admin access. Try again.") });
+    } finally {
+      setDeleting(false);
       await reload();
     }
   };
@@ -264,13 +286,7 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
               onDelete={() => setDialog({ kind: "delete-member", member })}
               onManageAccount={() => setDialog({ kind: "account", member })}
               onRemoveAccount={() => setDialog({ kind: "remove-account", member })}
-              onToggleAdmin={(isAdmin) =>
-                void runForMember(
-                  member,
-                  () => setMemberAdmin(member.id, isAdmin),
-                  isAdmin ? `${member.name} can now use the admin panel` : `${member.name} no longer has the admin panel`,
-                )
-              }
+              onToggleAdmin={(isAdmin) => setDialog({ kind: "set-admin", member, isAdmin })}
               onHistory={() => setDialog({ kind: "history", member })}
             />
           ))}
@@ -350,6 +366,20 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
             setDialog(null);
             void reload();
           }}
+        />
+      )}
+
+      {dialog?.kind === "set-admin" && (
+        <ConfirmDialog
+          title={dialog.isAdmin ? `Make ${dialog.member.name} an admin?` : `Take admin away from ${dialog.member.name}?`}
+          detail={
+            dialog.isAdmin
+              ? "They will be able to change doors, PINs, people and read the log from their phone. They can also make others admin."
+              : "They go back to only unlocking doors. It takes full effect within a day."
+          }
+          busy={deleting}
+          onCancel={closeDialog}
+          onConfirmed={() => void confirmSetAdmin()}
         />
       )}
 

@@ -52,6 +52,14 @@ public class MembersController(IMemberService memberService) : ControllerBase
         [FromBody] SetMemberAdminRequest request,
         CancellationToken cancellationToken)
     {
+        // Nobody can take admin away from themselves (a person signed in with
+        // admin access has their own member id as the token's subject).
+        var callerId = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        if (!request.IsAdmin && callerId is not null && Guid.TryParse(callerId, out var caller) && caller == id)
+        {
+            return BadRequest("You can't take admin away from yourself. Ask another admin.");
+        }
+
         var result = await memberService.SetAdminAsync(id, request.IsAdmin, cancellationToken);
         return this.ToActionResult(result, member => Ok(MemberResponse.From(member)));
     }
