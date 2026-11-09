@@ -68,7 +68,7 @@ export function AppShell<Key extends string>({
         </main>
 
         {nav && (
-          <nav className="absolute bottom-[max(18px,env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-white/10 bg-nav p-1.5 shadow-[0_14px_30px_rgba(10,14,20,.28)]">
+          <nav className="fixed bottom-[max(18px,env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-white/10 bg-nav p-1.5 shadow-[0_14px_30px_rgba(10,14,20,.28)]">
             {nav.items.map(({ key, label, icon: Icon }) => {
               const on = key === nav.active;
               return (
