@@ -1,4 +1,5 @@
-import { DoorClosed, FingerprintPattern, History, KeyRound, Plus, Smartphone, Trash2, UserRound, X } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, DoorClosed, FingerprintPattern, History, KeyRound, Plus, Smartphone, Trash2, UserRound, X } from "lucide-react";
 
 import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,8 @@ export function MemberCard({
   onHistory,
 }: MemberCardProps) {
   const allowedDoors = doors.filter((door) => member.doorIds.includes(door.id));
+  // Dropdown style: each person is one tidy row; tap to open the details.
+  const [open, setOpen] = useState(false);
 
   return (
     <div
@@ -49,17 +52,35 @@ export function MemberCard({
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="flex size-11 flex-none items-center justify-center rounded-[12px] bg-secondary font-mono text-sm font-semibold text-secondary-foreground">
-          {initials(member.name)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-extrabold tracking-tight">{member.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {!member.enabled
-              ? "Disabled — can't open any door"
-              : `Can open ${allowedDoors.length} of ${doors.length} ${doors.length === 1 ? "door" : "doors"}`}
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+          aria-label={`${open ? "Hide" : "Show"} details for ${member.name}`}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] text-left"
+        >
+          <div className="flex size-11 flex-none items-center justify-center rounded-[12px] bg-secondary font-mono text-sm font-semibold text-secondary-foreground">
+            {initials(member.name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-base font-extrabold tracking-tight">
+              <span className="truncate">{member.name}</span>
+              {member.isAdmin && (
+                <span className="flex-none rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[9px] tracking-[.1em] text-primary uppercase">
+                  Admin
+                </span>
+              )}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {!member.enabled
+                ? "Disabled — can't open any door"
+                : `${member.username ? `@${member.username} · ` : "No sign-in · "}${allowedDoors.length} of ${doors.length} ${doors.length === 1 ? "door" : "doors"}`}
+            </p>
+          </div>
+          <ChevronDown
+            className={cn("size-5 flex-none text-muted-foreground transition-transform", open && "rotate-180")}
+          />
+        </button>
         <Switch
           checked={member.enabled}
           disabled={busy}
@@ -68,6 +89,8 @@ export function MemberCard({
         />
       </div>
 
+      {open && (
+        <>
       {/* Their sign-in for the /account page */}
       <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
         <div className="flex items-center gap-3">
@@ -250,6 +273,8 @@ export function MemberCard({
           Delete person
         </Button>
       </div>
+        </>
+      )}
     </div>
   );
 }
