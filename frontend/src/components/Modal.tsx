@@ -28,13 +28,13 @@ export function Modal({ title, subtitle, onClose, children, className }: ModalPr
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          "max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-[20px] border border-border bg-card p-5 text-card-foreground",
+          "max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto rounded-[24px] border border-border bg-card p-5 shadow-2xl text-card-foreground",
           className,
         )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <h3 className="text-base font-extrabold tracking-tight">{title}</h3>
+            <h3 className="text-base font-semibold tracking-tight">{title}</h3>
             {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
           </div>
           <button

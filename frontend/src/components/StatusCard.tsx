@@ -1,15 +1,19 @@
-import type { LucideIcon } from "lucide-react";
-
-import { SectionLabel } from "@/components/SectionLabel";
 import { cn } from "@/lib/utils";
 
 export type StatusTone = "good" | "warn" | "bad" | "unknown";
 
 const DOT_CLASS: Record<StatusTone, string> = {
   good: "bg-success",
-  warn: "bg-warning",
+  warn: "bg-primary",
   bad: "bg-destructive",
   unknown: "bg-muted-foreground/40",
+};
+
+const VALUE_CLASS: Record<StatusTone, string> = {
+  good: "",
+  warn: "text-primary dark:text-accent-foreground",
+  bad: "text-destructive",
+  unknown: "",
 };
 
 interface StatusCardProps {
@@ -17,21 +21,18 @@ interface StatusCardProps {
   value: string;
   detail: string;
   tone: StatusTone;
-  icon: LucideIcon;
 }
 
-export function StatusCard({ label, value, detail, tone, icon: Icon }: StatusCardProps) {
+// One cell of a door's status grid (cells share thin lines, see DoorCard).
+export function StatusCard({ label, value, detail, tone }: StatusCardProps) {
   return (
-    <div className="flex flex-col gap-2 rounded-[18px] border border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <SectionLabel>{label}</SectionLabel>
-        <Icon className="size-4 text-muted-foreground" />
+    <div className="min-w-0 bg-card px-4 py-3">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 flex items-center gap-1.5 text-sm font-semibold", VALUE_CLASS[tone])}>
+        <span className={cn("size-[7px] flex-none rounded-full", DOT_CLASS[tone])} />
+        {value}
       </div>
-      <div className="flex items-center gap-2">
-        <span className={cn("size-2.5 flex-none rounded-full", DOT_CLASS[tone])} />
-        <span className="text-base font-extrabold tracking-tight uppercase">{value}</span>
-      </div>
-      <span className="truncate text-xs text-muted-foreground">{detail}</span>
+      <div className="mt-0.5 truncate font-mono text-[10.5px] text-muted-foreground">{detail}</div>
     </div>
   );
 }

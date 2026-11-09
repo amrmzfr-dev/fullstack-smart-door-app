@@ -76,7 +76,7 @@ export function PhoneSetupPage({ token, theme, onToggleTheme }: PhoneSetupPagePr
           <div className="flex size-8 items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
             <DoorClosed className="size-4" strokeWidth={2.25} />
           </div>
-          <span className="text-base font-extrabold tracking-tight uppercase">Smart Door</span>
+          <span className="text-base font-semibold tracking-tight">Smart Door</span>
         </div>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </header>
@@ -105,7 +105,7 @@ export function PhoneSetupPage({ token, theme, onToggleTheme }: PhoneSetupPagePr
             </StatusBlock>
             <a
               href="/"
-              className="key3d key3d-primary rounded-[16px] px-6 py-3 text-sm font-extrabold tracking-tight uppercase"
+              className="key3d key3d-primary rounded-[16px] px-6 py-3 text-sm font-semibold tracking-tight"
             >
               Go to the keypad
             </a>
@@ -118,7 +118,7 @@ export function PhoneSetupPage({ token, theme, onToggleTheme }: PhoneSetupPagePr
               <p className="font-mono text-[11px] tracking-[.16em] text-muted-foreground uppercase">
                 Phone fingerprint setup
               </p>
-              <h1 className="text-[clamp(22px,4dvh,32px)] leading-tight font-extrabold tracking-tight">
+              <h1 className="text-[clamp(22px,4dvh,32px)] leading-tight font-semibold tracking-tight">
                 Hi {memberName}
               </h1>
               <p className="mx-auto max-w-[300px] text-sm text-muted-foreground">
@@ -181,7 +181,7 @@ function StatusBlock({ icon, tone, title, children }: StatusBlockProps) {
       >
         {icon}
       </div>
-      <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="text-sm text-muted-foreground">{children}</p>
     </div>
   );

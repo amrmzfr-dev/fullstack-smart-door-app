@@ -185,14 +185,14 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
 
   return (
     <div className="space-y-4">
-      <SectionHeading label="People" title="Accounts, fingerprints and phones">
-        <Button onClick={() => setDialog({ kind: "add" })}>
+      <SectionHeading label="People" title="Who has access">
+        <Button variant="ink" onClick={() => setDialog({ kind: "add" })}>
           <Plus />
           Add person
         </Button>
       </SectionHeading>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-center text-xs text-muted-foreground">
         {members.length} {members.length === 1 ? "person" : "people"} · {accountCount}{" "}
         {accountCount === 1 ? "sign-in" : "sign-ins"} · {fingerprintCount}{" "}
         {fingerprintCount === 1 ? "fingerprint" : "fingerprints"} · {phoneCount} {phoneCount === 1 ? "phone" : "phones"}
@@ -200,27 +200,27 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
           " · Offline doors pick up changes when they reconnect; adding a fingerprint needs that door online"}
       </p>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative sm:max-w-xs sm:flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name or username"
             aria-label="Search people"
-            className="h-9 rounded-[12px] pl-9"
+            className="h-[42px] rounded-[11px] pl-10"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px]">
           {FILTERS.map(({ key, label }) => (
             <button
               key={key}
               type="button"
               onClick={() => setFilter(key)}
               className={cn(
-                "rounded-full border px-3 py-1.5 font-mono text-[10px] font-medium tracking-[.12em] uppercase transition-colors",
+                "flex-none rounded-full border px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors",
                 filter === key
-                  ? "border-transparent bg-primary text-primary-foreground"
+                  ? "border-transparent bg-foreground text-background"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
@@ -243,7 +243,7 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {visible.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-[18px] border border-dashed border-border p-10 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-input p-10 text-center">
           <Users className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
             {loading
@@ -254,7 +254,7 @@ export function PeopleTab({ doors }: { doors: Door[] }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
           {visible.map((member) => (
             <MemberCard
               key={member.id}

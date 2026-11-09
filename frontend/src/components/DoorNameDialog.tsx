@@ -38,7 +38,7 @@ export function DoorNameDialog({ title, subtitle, submitLabel, initialName = "",
     <Modal title={title} subtitle={subtitle} onClose={onClose}>
       <form onSubmit={(event) => void submit(event)} className="space-y-4">
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground">
             Door name
           </span>
           <Input
@@ -54,7 +54,7 @@ export function DoorNameDialog({ title, subtitle, submitLabel, initialName = "",
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button
           type="submit"
-          className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase"
+          className="h-[50px] w-full rounded-full text-[15px] font-semibold"
           disabled={saving || name.trim().length === 0}
         >
           {saving && <LoaderCircle className="animate-spin" />}

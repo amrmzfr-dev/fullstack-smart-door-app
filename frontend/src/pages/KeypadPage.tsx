@@ -378,7 +378,7 @@ export function KeypadPage({ theme, onToggleTheme }: KeypadPageProps) {
           <span className="flex size-8 flex-none items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
             <Menu className="size-4" strokeWidth={2.25} />
           </span>
-          <span className="min-w-0 truncate text-base font-extrabold tracking-tight uppercase">
+          <span className="min-w-0 truncate text-base font-semibold tracking-tight">
             {door?.name ?? "Smart Door"}
           </span>
           <ChevronDown className="size-4 flex-none text-muted-foreground" />

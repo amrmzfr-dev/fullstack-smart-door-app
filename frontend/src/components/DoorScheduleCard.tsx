@@ -78,12 +78,12 @@ export function DoorScheduleCard({ door, onChanged, onNotice }: DoorScheduleCard
   };
 
   return (
-    <div className="space-y-3 rounded-[14px] bg-secondary/60 p-3">
-      <div className="flex items-center gap-3">
-        <CalendarClock className="size-4 flex-none text-muted-foreground" />
+    <div className="space-y-3.5 px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <CalendarClock className="mt-px size-[18px] flex-none text-muted-foreground" strokeWidth={1.8} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Open hours</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="text-sm font-semibold">Open hours</p>
+          <p className="mt-0.5 text-xs leading-[1.45] text-muted-foreground">
             {saved.enabled
               ? `Unlocked ${formatTime(saved.from)} – ${formatTime(saved.until)}, ${describeDays(saved.days)}. Locked otherwise.`
               : "Off — the door only opens with a PIN, fingerprint or phone."}
@@ -97,7 +97,7 @@ export function DoorScheduleCard({ door, onChanged, onNotice }: DoorScheduleCard
         />
       </div>
 
-      <div className={cn("space-y-3", !draft.enabled && "opacity-60")}>
+      <div className={cn("space-y-3 rounded-xl bg-soft p-3.5", !draft.enabled && "opacity-60")}>
         <div className="flex flex-wrap items-end gap-3">
           <label className="space-y-1 text-xs font-medium text-muted-foreground">
             Unlocks at
@@ -132,10 +132,10 @@ export function DoorScheduleCard({ door, onChanged, onNotice }: DoorScheduleCard
                 disabled={busy}
                 onClick={() => toggleDay(day)}
                 className={cn(
-                  "h-8 min-w-12 rounded-lg border px-2.5 text-xs font-bold transition-colors disabled:opacity-50",
+                  "h-8 min-w-12 rounded-full border px-2.5 text-xs font-semibold transition-colors disabled:opacity-50",
                   on
                     ? "border-transparent bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:bg-secondary",
+                    : "border-border bg-card text-muted-foreground hover:bg-secondary",
                 )}
               >
                 {label}

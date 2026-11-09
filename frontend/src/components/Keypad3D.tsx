@@ -139,7 +139,7 @@ export function Keypad3D({ screen, tone, disabled = false, onKey }: Keypad3DProp
                   <Delete className="size-[36%] text-muted-foreground" />
                 ) : (
                   <>
-                    <span className="text-[calc(var(--key-h)*0.42)] leading-none font-extrabold">{key}</span>
+                    <span className="text-[calc(var(--key-h)*0.42)] leading-none font-semibold">{key}</span>
                     <span className="mt-0.5 font-mono text-[calc(var(--key-h)*0.15)] leading-none tracking-[.18em] text-muted-foreground">
                       {LETTERS[key] ?? ""}
                     </span>

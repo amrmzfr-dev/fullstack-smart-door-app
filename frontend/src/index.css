@@ -4,8 +4,8 @@
 @custom-variant short-landscape (@media (orientation: landscape) and (max-height: 560px));
 
 @theme inline {
-  --font-sans: "Archivo", system-ui, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --font-sans: "Poppins", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -30,79 +30,88 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-page: var(--page);
+  --color-nav: var(--nav);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-soft: var(--soft);
 }
 
-/* Same Gatekeep palette as the Gate Sensor app (accent #FF5B41 on ink
-   #0C0C0C), exposed through the shadcn tokens so every component just uses
-   bg-background / bg-card / text-primary etc. Light mode is the same accent
-   on the palette's cream (#F1EDE2) instead of ink. */
+/* Door Access palette: cool greys, ink #0A0E14 and one blue (#1F5EFF),
+   exposed through the shadcn tokens so every component just uses
+   bg-background / bg-card / text-primary etc. */
 :root {
   --radius: 0.85rem;
-  --background: #f4f1e8;
-  --foreground: #0c0c0c;
+  --page: #e9eef5;
+  --background: #f2f4f8;
+  --foreground: #0a0e14;
   --card: #ffffff;
-  --card-foreground: #0c0c0c;
+  --card-foreground: #0a0e14;
   --popover: #ffffff;
-  --popover-foreground: #0c0c0c;
-  --primary: #ff5b41;
-  --primary-foreground: #0c0c0c;
-  --secondary: #ebe7dc;
-  --secondary-foreground: #0c0c0c;
-  --muted: #ebe7dc;
-  --muted-foreground: #6b6a66;
-  --accent: #ffe4dd;
-  --accent-foreground: #c2371f;
-  --destructive: #e0432b;
-  --success: #3f8f2a;
+  --popover-foreground: #0a0e14;
+  --primary: #1f5eff;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f7;
+  --secondary-foreground: #0a0e14;
+  --soft: #f5f8fc;
+  --muted: #eef2f7;
+  --muted-foreground: #697386;
+  --accent: #e5edff;
+  --accent-foreground: #1747c9;
+  --destructive: #d93f3f;
+  --success: #1f9d5c;
   --warning: #b8860b;
-  --border: rgba(12, 12, 12, 0.1);
-  --input: rgba(12, 12, 12, 0.12);
-  --ring: #ff5b41;
+  --border: #e3e9f1;
+  --input: #d5dee9;
+  --ring: #1f5eff;
+  --nav: #0a0e14;
+  --nav-foreground: #8c94a6;
 
-  /* 3D keypad (public unlock app) */
+  /* 3D keypad (/keypad) */
   --key-face: #ffffff;
-  --key-side: #b9b09a;
+  --key-side: #b4bdcc;
   --key-highlight: rgba(255, 255, 255, 0.95);
-  --key-drop: rgba(12, 12, 12, 0.18);
-  --screen: #d9dccb;
-  --screen-inset: rgba(12, 12, 12, 0.22);
+  --key-drop: rgba(10, 14, 20, 0.18);
+  --screen: #dde4f0;
+  --screen-inset: rgba(10, 14, 20, 0.22);
 
   /* Vault lock metal */
   --vault-face: #c9ccd1;
   --vault-side: #7d828a;
   --vault-shine: rgba(255, 255, 255, 0.75);
-  --vault-shade: rgba(12, 12, 12, 0.14);
+  --vault-shade: rgba(10, 14, 20, 0.14);
 }
 
 .dark {
-  --background: #0c0c0c;
-  --foreground: #ffffff;
-  --card: #161616;
-  --card-foreground: #ffffff;
-  --popover: #161616;
-  --popover-foreground: #ffffff;
-  --primary: #ff5b41;
-  --primary-foreground: #0c0c0c;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #ffffff;
-  --muted: #1a1a1a;
-  --muted-foreground: #9a9a9a;
-  --accent: #2a1712;
-  --accent-foreground: #ff8a73;
-  --destructive: #ff5b41;
-  --success: #a8e063;
+  --page: #05070a;
+  --background: #0b0d12;
+  --foreground: #f4f6fa;
+  --card: #161a22;
+  --card-foreground: #f4f6fa;
+  --popover: #161a22;
+  --popover-foreground: #f4f6fa;
+  --primary: #1f5eff;
+  --primary-foreground: #ffffff;
+  --secondary: #202532;
+  --secondary-foreground: #f4f6fa;
+  --soft: #11141b;
+  --muted: #202532;
+  --muted-foreground: #8c94a6;
+  --accent: #1b2a4d;
+  --accent-foreground: #86a8ff;
+  --destructive: #ff6b6b;
+  --success: #3dd68c;
   --warning: #f4c33f;
-  --border: rgba(255, 255, 255, 0.09);
-  --input: rgba(255, 255, 255, 0.09);
-  --ring: #ff5b41;
+  --border: #232835;
+  --input: #2d3445;
+  --ring: #4c7dff;
+  --nav: #1a1f2b;
+  --nav-foreground: #8c94a6;
 
-  /* Face and edge are both lighter than the page so the edge shows up,
-     the same way the orange Enter key's darker-orange edge does. */
-  --key-face: #353535;
-  --key-side: #1c1c1c;
-  --key-highlight: rgba(255, 255, 255, 0.16);
+  --key-face: #2c3240;
+  --key-side: #161a22;
+  --key-highlight: rgba(255, 255, 255, 0.14);
   --key-drop: rgba(0, 0, 0, 0.6);
-  --screen: #070807;
+  --screen: #07090d;
   --screen-inset: rgba(0, 0, 0, 0.9);
 
   --vault-face: #52565c;
@@ -126,7 +135,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Archivo", system-ui, sans-serif;
+    font-family: "Poppins", system-ui, sans-serif;
   }
 }
 
@@ -140,6 +149,28 @@
   display: none;
   width: 0;
   height: 0;
+}
+
+/* Rings that ripple out from the lock on the Unlock page. */
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.animate-ring-pulse {
+  animation: ringPulse 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ring-pulse {
+    animation: none;
+  }
 }
 
 /* Pulse ring around the fingerprint while the door waits for a finger, and

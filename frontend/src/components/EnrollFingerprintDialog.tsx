@@ -69,7 +69,7 @@ export function EnrollFingerprintDialog({ member, door, onClose }: EnrollFingerp
       >
         <div className="space-y-4">
           <div className="space-y-2">
-            <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+            <span className="text-xs font-medium text-muted-foreground">
               Which finger
             </span>
             <div className="flex flex-wrap gap-2">
@@ -106,7 +106,7 @@ export function EnrollFingerprintDialog({ member, door, onClose }: EnrollFingerp
           {startError && <p className="text-xs text-destructive">{startError}</p>}
 
           <Button
-            className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase"
+            className="h-[50px] w-full rounded-full text-[15px] font-semibold"
             disabled={starting || !doorOnline || label.trim().length === 0}
             onClick={() => void begin()}
           >
@@ -172,7 +172,7 @@ export function EnrollFingerprintDialog({ member, door, onClose }: EnrollFingerp
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-xl font-extrabold tracking-tight uppercase">{headline}</p>
+            <p className="text-xl font-semibold tracking-tight">{headline}</p>
             <p className="text-sm text-muted-foreground">{detail}</p>
           </div>
         </div>
@@ -214,7 +214,7 @@ export function EnrollFingerprintDialog({ member, door, onClose }: EnrollFingerp
                 Try again
               </Button>
             )}
-            <Button className="h-10 flex-1 rounded-[12px] font-bold" onClick={onClose}>
+            <Button className="h-10 flex-1 rounded-[12px] font-semibold" onClick={onClose}>
               Done
             </Button>
           </div>

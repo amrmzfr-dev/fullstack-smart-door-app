@@ -35,3 +35,26 @@ export function isInsideOpenHours(schedule: DoorSchedule, nowMs: number): boolea
   const [untilH, untilM] = schedule.until.split(":").map(Number);
   return minutes >= fromH * 60 + fromM && minutes < untilH * 60 + untilM;
 }
+
+export interface OpenHoursProgress {
+  // 0-100: how far through today's open hours we are.
+  percent: number;
+  // "6h 18m left"
+  remaining: string;
+}
+
+// How far through today's open hours the door is (null outside them).
+export function openHoursProgress(schedule: DoorSchedule, nowMs: number): OpenHoursProgress | null {
+  if (!isInsideOpenHours(schedule, nowMs)) return null;
+  const local = new Date(nowMs + schedule.utcOffsetMinutes * 60_000);
+  const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const [fromH, fromM] = schedule.from.split(":").map(Number);
+  const [untilH, untilM] = schedule.until.split(":").map(Number);
+  const from = fromH * 60 + fromM;
+  const until = untilH * 60 + untilM;
+  const left = until - minutes;
+  return {
+    percent: Math.min(100, Math.max(0, ((minutes - from) / (until - from)) * 100)),
+    remaining: left >= 60 ? `${Math.floor(left / 60)}h ${left % 60}m left` : `${left}m left`,
+  };
+}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   DoorClosed,
   DoorOpen,
@@ -17,15 +18,15 @@ import { cn } from "@/lib/utils";
 import type { AccessEvent } from "@/types";
 
 const TILE_CLASS: Record<EventTone, string> = {
-  success: "bg-success/15 text-success",
+  success: "bg-accent text-accent-foreground",
   danger: "bg-destructive/15 text-destructive",
-  muted: "bg-secondary text-muted-foreground",
+  muted: "bg-secondary text-foreground",
 };
 
 const BADGE_CLASS: Record<EventTone, string> = {
-  success: "bg-success/15 text-success",
+  success: "bg-accent text-accent-foreground",
   danger: "bg-destructive/15 text-destructive",
-  muted: "bg-secondary text-secondary-foreground",
+  muted: "bg-secondary text-muted-foreground",
 };
 
 function eventIcon(event: AccessEvent): LucideIcon {
@@ -63,19 +64,23 @@ function eventIcon(event: AccessEvent): LucideIcon {
   }
 }
 
+// A card holding a run of EventRows, separated by thin lines.
+export function EventList({ children }: { children: ReactNode }) {
+  return <div className="overflow-hidden rounded-2xl border border-border bg-card">{children}</div>;
+}
+
+// One log line. Put several inside an <EventList>.
 export function EventRow({ event }: { event: AccessEvent }) {
   const description = describeEvent(event);
   const Icon = eventIcon(event);
 
   return (
-    <div className="flex items-center gap-3 rounded-[16px] border border-border bg-card p-3">
-      <div
-        className={cn("flex size-10 flex-none items-center justify-center rounded-[11px]", TILE_CLASS[description.tone])}
-      >
-        <Icon className="size-4.5" />
+    <div className="flex items-center gap-3 border-b border-border px-3.5 py-3 last:border-b-0">
+      <div className={cn("flex size-9 flex-none items-center justify-center rounded-[10px]", TILE_CLASS[description.tone])}>
+        <Icon className="size-[17px]" strokeWidth={1.9} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold">{description.title}</p>
+        <p className="truncate text-sm font-semibold">{description.title}</p>
         {(event.doorName || description.detail) && (
           <p className="truncate text-xs text-muted-foreground">
             {[event.doorName, description.detail].filter(Boolean).join(" · ")}
@@ -83,15 +88,10 @@ export function EventRow({ event }: { event: AccessEvent }) {
         )}
       </div>
       <div className="flex flex-none flex-col items-end gap-1">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 font-mono text-[9px] tracking-[.08em] uppercase",
-            BADGE_CLASS[description.tone],
-          )}
-        >
+        <span className={cn("rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-semibold", BADGE_CLASS[description.tone])}>
           {description.badge}
         </span>
-        <span className="font-mono text-[10px] text-muted-foreground">{formatTime(event.occurredAt)}</span>
+        <span className="font-mono text-[11px] text-muted-foreground">{formatTime(event.occurredAt)}</span>
       </div>
     </div>
   );

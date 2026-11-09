@@ -14,12 +14,12 @@ interface LoginPageProps {
 }
 
 const INPUT_CLASS =
-  "h-[46px] w-full rounded-[14px] border border-border bg-card px-3.5 text-sm font-medium text-card-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary";
+  "h-12 w-full rounded-[14px] border border-input bg-card px-4 text-sm font-medium text-card-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </label>
   );
@@ -55,68 +55,73 @@ export function LoginPage({
   };
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-background p-6">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-      </div>
-
-      <div className="flex w-full max-w-[340px] flex-col gap-7">
-        <div className="flex flex-col items-center gap-2.5 text-center">
-          <div className="flex size-12 items-center justify-center rounded-[12px] bg-primary text-primary-foreground">
-            <DoorClosed className="size-6" strokeWidth={2.25} />
-          </div>
-          <h1 className="text-[26px] leading-[.95] font-extrabold tracking-[-.03em] uppercase">Smart Door</h1>
-          <p className="font-mono text-[11px] tracking-[.04em] text-muted-foreground">
-            {subtitle}
-          </p>
+    <div className="flex min-h-dvh justify-center bg-page">
+      <div className="relative flex min-h-dvh w-full max-w-[440px] flex-col justify-center bg-background p-6 sm:shadow-[0_20px_60px_rgba(15,40,80,.12)]">
+        <div className="absolute top-[max(18px,env(safe-area-inset-top))] right-[18px]">
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </div>
 
-        <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-3.5">
-          <Field label="Username">
-            <input
-              name="username"
-              autoComplete="username"
-              autoFocus
-              required
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </Field>
-
-          <Field label="Password">
-            <div className="relative">
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className={`${INPUT_CLASS} pr-10`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((current) => !current)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <DoorClosed className="size-7" strokeWidth={1.8} />
             </div>
-          </Field>
+            <div>
+              <h1 className="text-[28px] leading-tight font-semibold tracking-[-.02em]">Smart Door</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+            </div>
+          </div>
 
-          {error && <span className="text-xs text-destructive">{error}</span>}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex h-[46px] items-center justify-center gap-2 rounded-[14px] bg-primary text-sm font-extrabold tracking-[-.01em] text-primary-foreground uppercase transition-opacity hover:opacity-90 disabled:opacity-70"
+          <form
+            onSubmit={(event) => void handleSubmit(event)}
+            className="flex flex-col gap-4 rounded-[28px] border border-border bg-card p-5"
           >
-            {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <Lock className="size-4" />}
-            Sign in
-          </button>
-        </form>
+            <Field label="Username">
+              <input
+                name="username"
+                autoComplete="username"
+                autoFocus
+                required
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                className={INPUT_CLASS}
+              />
+            </Field>
+
+            <Field label="Password">
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className={`${INPUT_CLASS} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </Field>
+
+            {error && <span className="text-xs text-destructive">{error}</span>}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex h-[54px] items-center justify-center gap-2.5 rounded-full bg-foreground text-[15px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {submitting ? <LoaderCircle className="size-[18px] animate-spin" /> : <Lock className="size-[18px]" strokeWidth={1.8} />}
+              Sign in
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

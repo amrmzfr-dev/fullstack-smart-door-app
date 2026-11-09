@@ -86,15 +86,15 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
   const mapsUrl = hasCentre ? `https://www.google.com/maps?q=${draft.latitude},${draft.longitude}` : null;
 
   return (
-    <div className="space-y-3 rounded-[14px] bg-secondary/60 p-3">
-      <div className="flex items-center gap-3">
-        <MapPin className="size-4 flex-none text-muted-foreground" />
+    <div className="border-b border-border px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <MapPin className="mt-px size-[18px] flex-none text-muted-foreground" strokeWidth={1.8} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Only near the door (geofence)</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm font-semibold">Geofence</p>
+          <p className="mt-0.5 text-xs leading-[1.45] text-muted-foreground">
             {saved.enabled
-              ? `On — phones must be within ${saved.radiusMeters} m of the door to unlock.`
-              : "Off — people can press Unlock from anywhere."}
+              ? `On — phones must be within ${saved.radiusMeters} m of the door.`
+              : "Off — phones can unlock from anywhere."}
           </p>
         </div>
         <Switch
@@ -110,6 +110,7 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
         />
       </div>
 
+      <div className="mt-3.5 space-y-3 rounded-xl bg-soft p-3.5">
       {!hasCentre && (
         <p className="text-xs text-muted-foreground">
           Stand at the door with your phone, press "Use my location", then Save. After that you can switch this on.
@@ -118,10 +119,10 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[.12em] text-muted-foreground uppercase">Latitude</span>
+          <span className="text-[11px] font-medium text-muted-foreground">Latitude</span>
           <Input
             inputMode="decimal"
-            className="h-10 w-36 rounded-[12px]"
+            className="h-10 w-36 rounded-[9px] font-mono"
             value={draft.latitude ?? ""}
             onChange={(event) => {
               const value = event.target.value.trim();
@@ -130,10 +131,10 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[.12em] text-muted-foreground uppercase">Longitude</span>
+          <span className="text-[11px] font-medium text-muted-foreground">Longitude</span>
           <Input
             inputMode="decimal"
-            className="h-10 w-36 rounded-[12px]"
+            className="h-10 w-36 rounded-[9px] font-mono"
             value={draft.longitude ?? ""}
             onChange={(event) => {
               const value = event.target.value.trim();
@@ -142,12 +143,12 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[.12em] text-muted-foreground uppercase">Distance (m)</span>
+          <span className="text-[11px] font-medium text-muted-foreground">Distance (m)</span>
           <Input
             type="number"
             min={MIN_RADIUS}
             max={MAX_RADIUS}
-            className="h-10 w-28 rounded-[12px]"
+            className="h-10 w-28 rounded-[9px] font-mono"
             value={draft.radiusMeters}
             onChange={(event) => setDraft({ ...draft, radiusMeters: Math.round(Number(event.target.value)) })}
           />
@@ -173,13 +174,14 @@ export function DoorGeofenceCard({ door, onChanged, onNotice }: DoorGeofenceCard
             className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             <ExternalLink className="size-3.5" />
-            Check on map
+            View on map
           </a>
         )}
         <Button className="ml-auto" size="sm" disabled={busy || !canSave} onClick={() => void save(draft)}>
           {busy && <LoaderCircle className="animate-spin" />}
           Save
         </Button>
+      </div>
       </div>
     </div>
   );

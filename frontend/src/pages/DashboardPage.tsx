@@ -1,25 +1,11 @@
 import { useState } from "react";
-import { DoorClosed, LayoutDashboard, LogOut, ScrollText, UserRound, Users, Wifi, WifiOff, type LucideIcon } from "lucide-react";
+import { UserRound } from "lucide-react";
 
+import { ADMIN_SECTIONS, AdminSections, type AdminSection } from "@/components/AdminSections";
+import { AppShell } from "@/components/AppShell";
 import { ProfileDialog } from "@/components/ProfileDialog";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Button } from "@/components/ui/button";
-import { useDoors, useEvents } from "@/hooks/useDoorData";
+import { ROUND_BUTTON_CLASS } from "@/components/ThemeToggle";
 import type { Theme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
-import { DoorsTab } from "@/pages/DoorsTab";
-import { LogTab } from "@/pages/LogTab";
-import { OverviewTab } from "@/pages/OverviewTab";
-import { PeopleTab } from "@/pages/PeopleTab";
-
-type Tab = "overview" | "doors" | "people" | "log";
-
-const TABS: ReadonlyArray<{ key: Tab; label: string; icon: LucideIcon }> = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard },
-  { key: "doors", label: "Doors", icon: DoorClosed },
-  { key: "people", label: "People", icon: Users },
-  { key: "log", label: "Log", icon: ScrollText },
-];
 
 interface DashboardPageProps {
   username: string | null;
@@ -28,123 +14,31 @@ interface DashboardPageProps {
   onToggleTheme: () => void;
 }
 
+// /admin — the management dashboard for the master admin login.
 export function DashboardPage({ username, onLogout, theme, onToggleTheme }: DashboardPageProps) {
-  const [tab, setTab] = useState<Tab>("overview");
+  const [section, setSection] = useState<AdminSection>("overview");
   const [profileOpen, setProfileOpen] = useState(false);
-  const { doors, loaded: doorsLoaded, error: statusError, refresh: refreshDoors } = useDoors();
-  const { events, loading: eventsLoading } = useEvents();
-
-  const onlineCount = doors.filter((door) => door.online).length;
-  const online = onlineCount > 0;
 
   return (
-    <div className="min-h-dvh bg-background pb-24 text-foreground sm:pb-10">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-primary text-primary-foreground">
-              <DoorClosed className="size-5" strokeWidth={2.25} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl leading-tight font-extrabold tracking-tight uppercase">Smart Door</h1>
-              <p className="truncate font-mono text-xs text-muted-foreground">Admin · doors, people and activity</p>
-            </div>
-          </div>
-
-          <div className="flex flex-none items-center gap-2">
-            <span
-              className={cn(
-                "hidden items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] tracking-[.1em] uppercase sm:inline-flex",
-                statusError
-                  ? "bg-destructive/10 text-destructive"
-                  : online
-                    ? "bg-success/15 text-success"
-                    : "bg-secondary text-muted-foreground",
-              )}
-            >
-              {online && !statusError ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
-              {statusError ? "Server unreachable" : `${onlineCount} of ${doors.length} doors online`}
-            </span>
-            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setProfileOpen(true)}
-              aria-label={`My profile${username ? ` (${username})` : ""}`}
-            >
-              <UserRound />
-            </Button>
-            <Button variant="outline" size="icon" onClick={onLogout} aria-label={`Sign out ${username ?? ""}`.trim()}>
-              <LogOut />
-            </Button>
-          </div>
-        </div>
-
-        {/* Desktop tabs */}
-        <nav className="mx-auto hidden max-w-6xl gap-1 px-4 sm:flex sm:px-6">
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={cn(
-                "-mb-px flex items-center gap-2 border-b-2 px-3 pb-3 font-mono text-[11px] font-medium tracking-[.12em] uppercase transition-colors",
-                tab === key
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="size-3.5" />
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        {statusError && (
-          <p className="mb-6 rounded-[12px] bg-destructive/10 px-3 py-2 text-sm text-destructive sm:hidden">
-            {statusError}
-          </p>
-        )}
-        {tab === "overview" && (
-          <OverviewTab doors={doors} events={events} eventsLoading={eventsLoading} onGo={setTab} />
-        )}
-        {tab === "doors" && (
-          <DoorsTab
-            doors={doors}
-            loaded={doorsLoaded}
-            events={events}
-            eventsLoading={eventsLoading}
-            onViewLog={() => setTab("log")}
-            onDoorsChanged={() => void refreshDoors()}
-          />
-        )}
-        {tab === "people" && <PeopleTab doors={doors} />}
-        {tab === "log" && <LogTab events={events} doors={doors} loading={eventsLoading} />}
-      </main>
-
+    <AppShell
+      name={username ?? "Admin"}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      onLogout={onLogout}
+      actions={
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          aria-label={`My profile${username ? ` (${username})` : ""}`}
+          className={ROUND_BUTTON_CLASS}
+        >
+          <UserRound className="size-[18px]" strokeWidth={1.8} />
+        </button>
+      }
+      nav={{ items: ADMIN_SECTIONS, active: section, onGo: setSection }}
+    >
+      <AdminSections section={section} onGo={setSection} />
       {profileOpen && <ProfileDialog onClose={() => setProfileOpen(false)} />}
-
-      {/* Mobile bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <div className="grid grid-cols-4">
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={cn(
-                "flex flex-col items-center gap-1 py-2.5 font-mono text-[10px] tracking-[.12em] uppercase",
-                tab === key ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <Icon className="size-5" />
-              {label}
-            </button>
-          ))}
-        </div>
-      </nav>
-    </div>
+    </AppShell>
   );
 }

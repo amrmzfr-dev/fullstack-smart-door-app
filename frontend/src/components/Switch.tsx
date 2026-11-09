@@ -17,16 +17,11 @@ export function Switch({ checked, onChange, disabled, label }: SwitchProps) {
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-6 w-11 flex-none items-center rounded-full border transition-colors disabled:opacity-50",
-        checked ? "border-transparent bg-primary" : "border-border bg-muted",
+        "flex h-[26px] w-11 flex-none items-center rounded-full p-[3px] transition-colors disabled:opacity-50",
+        checked ? "justify-end bg-primary" : "justify-start bg-input",
       )}
     >
-      <span
-        className={cn(
-          "inline-block size-4 rounded-full transition-transform",
-          checked ? "translate-x-6 bg-primary-foreground" : "translate-x-1 bg-muted-foreground",
-        )}
-      />
+      <span className="size-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,.2)]" />
     </button>
   );
 }

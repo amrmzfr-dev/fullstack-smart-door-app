@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 
-import { EventRow } from "@/components/EventRow";
+import { EventList, EventRow } from "@/components/EventRow";
 import { SectionHeading, SectionLabel } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,8 @@ const RANGES: ReadonlyArray<{ key: Range; label: string }> = [
   { key: "all", label: "All loaded" },
 ];
 
-const SELECT_CLASS = "h-8 rounded-lg border border-border bg-card px-2 text-sm text-foreground";
+const SELECT_CLASS =
+  "h-[38px] min-w-0 rounded-[10px] border border-border bg-card px-2 text-[12.5px] text-foreground outline-none focus:border-primary";
 
 interface DayGroup {
   key: string;
@@ -154,33 +155,36 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <SectionHeading label="Log" title="Who used the doors, and when">
-        <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => exportCsv(filtered)}>
+    <div className="space-y-3.5">
+      <SectionHeading label="Activity log" title="Who used the doors">
+        <Button variant="outline" disabled={filtered.length === 0} onClick={() => exportCsv(filtered)}>
           <Download />
-          Export CSV
+          Export
         </Button>
       </SectionHeading>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-48 flex-1 sm:max-w-xs">
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search the log"
+            placeholder="Search name or event"
             aria-label="Search the log"
-            className="h-8 rounded-lg pl-9"
+            className="h-[42px] rounded-[11px] pl-9"
           />
         </div>
-        <select value={range} onChange={(event) => setRange(event.target.value as Range)} aria-label="Time range" className={SELECT_CLASS}>
+        <select value={range} onChange={(event) => setRange(event.target.value as Range)} aria-label="Time range" className={cn(SELECT_CLASS, "h-[42px] rounded-[11px] px-2.5 font-medium")}>
           {RANGES.map(({ key, label }) => (
             <option key={key} value={key}>
               {label}
             </option>
           ))}
         </select>
-        {doors.length > 1 && (
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {doors.length > 1 ? (
           <select value={doorFilter} onChange={(event) => setDoorFilter(event.target.value)} aria-label="Filter by door" className={SELECT_CLASS}>
             <option value="all">All doors</option>
             {doors.map((door) => (
@@ -189,8 +193,10 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
               </option>
             ))}
           </select>
+        ) : (
+          <span />
         )}
-        {people.length > 0 && (
+        {people.length > 0 ? (
           <select value={personFilter} onChange={(event) => setPersonFilter(event.target.value)} aria-label="Filter by person" className={SELECT_CLASS}>
             <option value="all">Everyone</option>
             {people.map((name) => (
@@ -199,8 +205,10 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
               </option>
             ))}
           </select>
+        ) : (
+          <span />
         )}
-        {methods.length > 1 && (
+        {methods.length > 1 ? (
           <select
             value={methodFilter}
             onChange={(event) => setMethodFilter(event.target.value as "all" | AccessMethod)}
@@ -214,20 +222,22 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
               </option>
             ))}
           </select>
+        ) : (
+          <span />
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-1.5 overflow-x-auto rounded-xl bg-secondary p-1">
         {FILTERS.map(({ key, label }) => (
           <button
             key={key}
             type="button"
             onClick={() => setFilter(key)}
             className={cn(
-              "rounded-full border px-3 py-1.5 font-mono text-[10px] font-medium tracking-[.12em] uppercase transition-colors",
+              "h-8 flex-1 rounded-[9px] px-2 text-[12.5px] font-semibold whitespace-nowrap transition-colors",
               filter === key
-                ? "border-transparent bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:text-foreground",
+                ? "bg-card text-foreground shadow-[0_1px_2px_rgba(10,14,20,.08),0_0_0_1px_rgba(10,14,20,.04)]"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {label}
@@ -235,11 +245,21 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span>{filtered.length} entries</span>
-        <span className="text-success">{opened} opened</span>
-        <span className={refused > 0 ? "text-destructive" : undefined}>{refused} turned away</span>
-        {alarms > 0 && <span className="text-destructive">{alarms} alarms</span>}
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
+        <span>
+          <b className="text-foreground">{filtered.length}</b> entries
+        </span>
+        <span>
+          <b className="text-primary dark:text-accent-foreground">{opened}</b> opened
+        </span>
+        <span>
+          <b className="text-foreground">{refused}</b> turned away
+        </span>
+        {alarms > 0 && (
+          <span>
+            <b className="text-destructive">{alarms}</b> alarms
+          </span>
+        )}
         {filtersActive && (
           <button type="button" onClick={clearFilters} className="underline underline-offset-2 hover:text-foreground">
             Clear filters
@@ -248,21 +268,21 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {loading ? "Loading events…" : events.length === 0 ? "Nothing recorded yet" : "Nothing matches these filters"}
+        <p className="rounded-2xl border border-border bg-card p-7 text-center text-[13px] text-muted-foreground">
+          {loading ? "Loading events…" : events.length === 0 ? "Nothing recorded yet" : "No entries match."}
         </p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {groups.map((group) => (
             <div key={group.key} className="space-y-2">
               <SectionLabel>
                 {group.label} · {group.items.length}
               </SectionLabel>
-              <div className="space-y-2">
+              <EventList>
                 {group.items.map((event) => (
                   <EventRow key={event.id} event={event} />
                 ))}
-              </div>
+              </EventList>
             </div>
           ))}
         </div>

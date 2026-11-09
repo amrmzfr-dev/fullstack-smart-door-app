@@ -100,7 +100,7 @@ export function PhoneInviteDialog({ member, onClose }: PhoneInviteDialogProps) {
             <div className="flex size-14 items-center justify-center rounded-full bg-success/15 text-success">
               <CircleCheck className="size-7" />
             </div>
-            <p className="text-lg font-extrabold tracking-tight">Phone added</p>
+            <p className="text-lg font-semibold tracking-tight">Phone added</p>
             <p className="text-sm text-muted-foreground">
               {member.name} can now open the door with their phone's fingerprint.
             </p>

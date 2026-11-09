@@ -25,7 +25,7 @@ interface FieldProps {
 function PasswordField({ label, value, onChange, autoComplete, autoFocus }: FieldProps) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <Input
         type="password"
         required
@@ -89,12 +89,12 @@ export function ProfileDialog({ onClose }: ProfileDialogProps) {
 
   return (
     <Modal title="My profile" subtitle="Your sign-in for the Smart Door admin" onClose={onClose}>
-      <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
+      <div className="flex items-center gap-3 rounded-[14px] border border-border bg-soft p-3">
         <div className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-primary text-primary-foreground">
           <UserRound className="size-5" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-extrabold tracking-tight">{me?.username ?? "…"}</p>
+          <p className="truncate text-sm font-semibold tracking-tight">{me?.username ?? "…"}</p>
           <p className="truncate font-mono text-xs text-muted-foreground">
             Password: {me?.passwordHint ?? "hint shows after your next sign-in"}
           </p>
@@ -111,7 +111,7 @@ export function ProfileDialog({ onClose }: ProfileDialogProps) {
         {error && <p className="text-xs text-destructive">{error}</p>}
         {saved && <p className="rounded-[12px] bg-success/15 px-3 py-2 text-sm text-success">Password changed.</p>}
 
-        <Button type="submit" className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase" disabled={!canSave}>
+        <Button type="submit" className="h-[50px] w-full rounded-full text-[15px] font-semibold" disabled={!canSave}>
           {saving && <LoaderCircle className="animate-spin" />}
           Change password
         </Button>

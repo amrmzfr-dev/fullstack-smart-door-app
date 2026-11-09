@@ -117,7 +117,7 @@ export function PinPadDialog({ door, onClose, onSaved }: PinPadDialogProps) {
     >
       <div className="space-y-4">
         <div className="space-y-2 text-center">
-          <p className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+          <p className="text-xs font-medium text-muted-foreground">
             {phase === "enter" ? "Step 1 of 2 · Type the new PIN" : "Step 2 of 2 · Type it again"}
           </p>
           <PinDisplay

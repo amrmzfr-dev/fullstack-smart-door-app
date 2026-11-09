@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { EventRow } from "@/components/EventRow";
+import { EventList, EventRow } from "@/components/EventRow";
 import { Modal } from "@/components/Modal";
 import { fetchMemberEvents } from "@/lib/door";
 import { dayKey, formatDay } from "@/lib/format";
@@ -52,7 +52,9 @@ export function MemberHistoryDialog({ member, onClose }: { member: Member; onClo
                   {formatDay(event.occurredAt)}
                 </p>
               )}
-              <EventRow event={event} />
+              <EventList>
+                <EventRow event={event} />
+              </EventList>
             </div>
           );
         })}

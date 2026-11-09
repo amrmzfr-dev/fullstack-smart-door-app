@@ -1,28 +1,37 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, DoorClosed, DoorOpen, KeyRound, LoaderCircle, Lock, LockOpen, LogOut, WifiOff } from "lucide-react";
+import { ArrowUpRight, Check, KeyRound, LayoutGrid, LoaderCircle, Lock, LockOpen, WifiOff } from "lucide-react";
 
 import { ADMIN_SECTIONS, AdminSections, type AdminSection } from "@/components/AdminSections";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Button } from "@/components/ui/button";
+import { AppShell, type NavItem } from "@/components/AppShell";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useNow } from "@/hooks/useNow";
 import { usePolling } from "@/hooks/usePolling";
 import { errorMessage } from "@/lib/api";
 import { clearSession, setSession } from "@/lib/auth";
-import { fetchMyAdminToken, fetchMyProfile, fetchMyUnlock, unlockMyDoor } from "@/lib/member";
-import { formatClock, isInsideOpenHours } from "@/lib/schedule";
+import { METHOD_LABELS } from "@/lib/events";
+import { formatClockTime, initials } from "@/lib/format";
+import { fetchMyActivity, fetchMyAdminToken, fetchMyProfile, fetchMyUnlock, unlockMyDoor } from "@/lib/member";
+import { describeSchedule, formatClock, isInsideOpenHours, openHoursProgress } from "@/lib/schedule";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { UnlockPinDialog } from "@/pages/AccountPage";
 import { LoginPage } from "@/pages/LoginPage";
-import type { MemberDoor, MemberProfile } from "@/types";
+import type { AccessEvent, MemberDoor, MemberProfile } from "@/types";
 
 const PROFILE_POLL_MS = 1500;
+const ACTIVITY_POLL_MS = 20000;
 const RESULT_SHOWN_MS = 5000;
+const RECENT_COUNT = 3;
 // The admin sign-in lasts a day; ask for a fresh one every hour.
 const ADMIN_TOKEN_REFRESH_MS = 3_600_000;
 const PICKED_DOOR_KEY = "smart-door-picked-door";
+
+type View = "unlock" | AdminSection;
+
+const NAV_ITEMS: ReadonlyArray<NavItem<View>> = [{ key: "unlock", label: "Unlock", icon: LockOpen }, ...ADMIN_SECTIONS];
+
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" });
 
 function readPickedDoor(): string | null {
   try {
@@ -47,7 +56,7 @@ interface UnlockPageProps {
 
 // "/" — the simple page: sign in once, see whether the door is locked, press
 // Unlock. Doors that need a PIN ask for it first. The old PIN keypad lives at
-// /keypad.
+// /keypad. People with admin access also get the admin pages in the bottom bar.
 export function UnlockPage({ theme, onToggleTheme }: UnlockPageProps) {
   const { isAuthenticated, login, logout } = useMemberAuth();
 
@@ -76,13 +85,13 @@ function UnlockHome({
 }) {
   const now = useNow(15000);
   const [profile, setProfile] = useState<MemberProfile | null>(null);
+  const [activity, setActivity] = useState<AccessEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(readPickedDoor);
-  const [chooserOpen, setChooserOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   // "unlock" = this page; otherwise an admin page (only for people with admin access).
-  const [view, setView] = useState<"unlock" | AdminSection>("unlock");
+  const [view, setView] = useState<View>("unlock");
   const [adminReady, setAdminReady] = useState(false);
   const { command, track, reset } = useCommandTracker(fetchMyUnlock, { pollMs: 0 });
 
@@ -95,6 +104,15 @@ function UnlockHome({
     }
   }, []);
   usePolling(loadProfile, PROFILE_POLL_MS);
+
+  const loadActivity = useCallback(async () => {
+    try {
+      setActivity(await fetchMyActivity(40));
+    } catch {
+      // Keep the last list.
+    }
+  }, []);
+  usePolling(loadActivity, ACTIVITY_POLL_MS);
 
   const isAdmin = profile?.isAdmin === true;
   const refreshAdminToken = useCallback(async () => {
@@ -120,9 +138,12 @@ function UnlockHome({
 
   useEffect(() => {
     if (command === null || !isFinished(command.status)) return;
-    const timer = window.setTimeout(reset, RESULT_SHOWN_MS);
+    const timer = window.setTimeout(() => {
+      reset();
+      void loadActivity();
+    }, RESULT_SHOWN_MS);
     return () => window.clearTimeout(timer);
-  }, [command, reset]);
+  }, [command, reset, loadActivity]);
 
   useEffect(() => {
     if (requestError === null) return;
@@ -147,7 +168,8 @@ function UnlockHome({
   // because someone just pressed Unlock: nothing to press until it locks again.
   const workingHours = door !== null && !offline && isOpen && !opening && isInsideOpenHours(door.schedule, now);
 
-  const stateText = door === null ? "" : offline ? "Offline" : workingHours ? "Working hours" : doorOpen ? "Door open" : isOpen ? "Unlocked" : "Locked";
+  const stateText =
+    door === null ? "" : offline ? "Offline" : workingHours ? "Working hours" : doorOpen ? "Door open" : isOpen ? "Unlocked" : "Locked";
   const blocked = door === null || offline || (door.pinRequired && !door.pinSet);
 
   const startUnlock = useCallback(
@@ -174,187 +196,224 @@ function UnlockHome({
   const pick = (id: string) => {
     savePickedDoor(id);
     setPickedId(id);
-    setChooserOpen(false);
     reset();
     setRequestError(null);
   };
 
-  const StatusIcon = offline ? WifiOff : doorOpen ? DoorOpen : isOpen ? LockOpen : Lock;
+  const progress = door && door.schedule.enabled ? openHoursProgress(door.schedule, now) : null;
+  const recent = door ? activity.filter((event) => event.type === "granted" && event.doorId === door.id).slice(0, RECENT_COUNT) : [];
+
+  const subText = opening
+    ? "Opening…"
+    : workingHours && door
+      ? `Door remains unlocked until ${formatClock(door.schedule.until)}`
+      : isOpen && !offline
+        ? "Push the door within 5 seconds"
+        : offline
+          ? "This door is offline right now"
+          : door && door.pinRequired && !door.pinSet
+            ? "This door has no PIN yet. Ask your admin."
+            : door && door.schedule.enabled
+              ? describeSchedule(door.schedule)
+              : "Tap Unlock to open the door";
+
+  const HeroIcon = offline ? WifiOff : isOpen ? LockOpen : Lock;
 
   return (
-    <div className="flex h-dvh flex-col bg-background text-foreground">
-      <header className="flex flex-none items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))]">
-        <div className="relative min-w-0">
-          <button
-            type="button"
-            onClick={() => doors.length > 1 && setChooserOpen((current) => !current)}
-            aria-label="Choose door"
-            className="flex min-w-0 items-center gap-2.5 rounded-[12px] py-1 pr-2 text-left hover:bg-secondary/60"
-          >
-            <span className="flex size-8 flex-none items-center justify-center rounded-[10px] bg-primary text-primary-foreground">
-              <DoorClosed className="size-4" strokeWidth={2.25} />
-            </span>
-            <span className="min-w-0 truncate text-base font-extrabold tracking-tight uppercase">
-              {door?.name ?? "Smart Door"}
-            </span>
-            {doors.length > 1 && <ChevronDown className="size-4 flex-none text-muted-foreground" />}
-          </button>
-          {chooserOpen && (
-            <div className="absolute top-full left-0 z-10 mt-1 w-64 space-y-1 rounded-[14px] border border-border bg-card p-1.5 shadow-lg">
-              {doors.map((candidate) => (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  onClick={() => pick(candidate.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-[10px] px-3 py-2.5 text-left text-sm font-semibold hover:bg-secondary",
-                    candidate.id === door?.id && "bg-secondary",
-                  )}
-                >
-                  <span className={cn("size-2 flex-none rounded-full", candidate.online ? "bg-success" : "bg-destructive")} />
-                  <span className="truncate">{candidate.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-none items-center gap-2">
-          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-          <Button variant="outline" size="icon" onClick={onLogout} aria-label="Sign out">
-            <LogOut />
-          </Button>
-        </div>
-      </header>
-
-      <main
-        className={cn(
-          "flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-6 pb-6",
-          view !== "unlock" && "hidden",
-          !isAdmin && "pb-[max(24px,env(safe-area-inset-bottom))]",
-        )}
-      >
-        {profile === null ? (
-          <p className="text-sm text-muted-foreground">{loadError ?? "Loading…"}</p>
-        ) : door === null ? (
-          <p className="max-w-xs text-center text-sm text-muted-foreground">
-            You can't open any door yet. Ask your admin to switch one on for you.
-          </p>
+    <AppShell
+      name={profile?.name ?? "there"}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      onLogout={onLogout}
+      nav={isAdmin ? { items: NAV_ITEMS, active: view, onGo: setView } : undefined}
+    >
+      {view !== "unlock" ? (
+        isAdmin && adminReady ? (
+          <AdminSections section={view} onGo={setView} />
         ) : (
-          <>
-            <div className="flex flex-col items-center gap-4">
-              <div
-                className={cn(
-                  "flex size-40 items-center justify-center rounded-full border-4 transition-colors duration-300",
-                  offline
-                    ? "border-muted-foreground/40 bg-secondary text-muted-foreground"
-                    : isOpen
-                      ? "border-success bg-success/15 text-success"
-                      : "border-destructive bg-destructive/10 text-destructive",
-                )}
-              >
-                <StatusIcon className="size-16" strokeWidth={1.75} />
-              </div>
-              <p
-                className={cn(
-                  "flex items-center gap-2 text-3xl font-extrabold tracking-tight uppercase",
-                  offline ? "text-muted-foreground" : isOpen ? "text-success" : "text-destructive",
-                )}
-              >
-                {stateText}
-              </p>
-              <p className="min-h-4 text-center text-xs text-muted-foreground">
-                {opening
-                  ? "Opening…"
-                  : workingHours && door
-                    ? `Door remains unlocked until ${formatClock(door.schedule.until)}`
-                    : isOpen && !offline
-                    ? "Push the door within 5 seconds"
-                    : offline
-                      ? "This door is offline right now"
-                      : door.pinRequired && !door.pinSet
-                        ? "This door has no PIN yet. Ask your admin."
-                        : ""}
-              </p>
+          <p className="p-6 text-center text-sm text-muted-foreground">Opening the admin panel…</p>
+        )
+      ) : profile === null ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">{loadError ?? "Loading…"}</p>
+      ) : door === null ? (
+        <p className="mx-auto max-w-xs py-16 text-center text-sm text-muted-foreground">
+          You can't open any door yet. Ask your admin to switch one on for you.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-[18px]">
+          {doors.length > 1 && (
+            <div className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] py-0.5">
+              {doors.map((candidate) => {
+                const on = candidate.id === door.id;
+                const candidateOpen = candidate.online && candidate.locked === false;
+                const ChipIcon = !candidate.online ? WifiOff : candidateOpen ? LockOpen : Lock;
+                return (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    onClick={() => pick(candidate.id)}
+                    className={cn(
+                      "flex h-[42px] flex-none items-center gap-2 rounded-full py-0 pr-1.5 pl-4 text-[13px] whitespace-nowrap transition-colors",
+                      on
+                        ? "bg-primary font-medium text-primary-foreground"
+                        : "border border-border bg-card text-muted-foreground",
+                    )}
+                  >
+                    {candidate.name}
+                    <span
+                      className={cn(
+                        "flex size-[30px] items-center justify-center rounded-full",
+                        on ? "bg-white text-primary" : "bg-secondary",
+                      )}
+                    >
+                      <ChipIcon className="size-3.5" strokeWidth={2} />
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-
-            <div className="w-full max-w-xs space-y-3">
-              {workingHours && door ? (
-                <div
-                  role="status"
-                  className="flex h-16 w-full items-center justify-center gap-2 rounded-[18px] border border-success/40 bg-success/15 text-lg font-extrabold text-success uppercase"
-                >
-                  <Check className="size-5" strokeWidth={3} />
-                  Unlocked until {formatClock(door.schedule.until)}
-                </div>
-              ) : isOpen && !opening && !offline ? (
-                // Already open: no second press needed, so the button turns
-                // into a calm "done" state instead of offering Unlock again.
-                <div
-                  role="status"
-                  className="flex h-16 w-full items-center justify-center gap-2 rounded-[18px] border border-success/40 bg-success/15 text-lg font-extrabold text-success uppercase"
-                >
-                  <Check className="size-5" strokeWidth={3} />
-                  {doorOpen ? "Door is open" : "Door unlocked"}
-                </div>
-              ) : (
-                <Button
-                  className="h-16 w-full rounded-[18px] text-lg font-extrabold uppercase"
-                  disabled={blocked || opening}
-                  onClick={press}
-                >
-                  {opening ? <LoaderCircle className="animate-spin" /> : door.pinRequired ? <KeyRound /> : <LockOpen />}
-                  {opening ? "Opening…" : "Unlock"}
-                </Button>
-              )}
-              {failed && <p className="text-center text-xs text-destructive">{command?.message ?? "The door didn't respond."}</p>}
-              {requestError && <p className="text-center text-xs text-destructive">{requestError}</p>}
-              {loadError && <p className="text-center text-xs text-destructive">{loadError}</p>}
-            </div>
-          </>
-        )}
-      </main>
-
-      {isAdmin && view !== "unlock" && (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {adminReady ? (
-            <AdminSections section={view} onGo={setView} />
-          ) : (
-            <p className="p-6 text-center text-sm text-muted-foreground">Opening the admin panel…</p>
           )}
-        </div>
-      )}
 
-      {/* Bottom bar under Unlock: only people the admin gave admin access ever see it. */}
-      {isAdmin && (
-        <nav className="flex-none border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-5">
-            <button
-              type="button"
-              onClick={() => setView("unlock")}
-              className={cn(
-                "flex flex-col items-center gap-1 py-2.5 font-mono text-[10px] tracking-[.12em] uppercase",
-                view === "unlock" ? "text-primary" : "text-muted-foreground",
+          {/* Hero: big lock, state in words, open-hours bar */}
+          <div className="relative overflow-hidden rounded-[28px] bg-primary px-[18px] pt-[18px] pb-[22px] text-primary-foreground">
+            <span className="pointer-events-none absolute -top-[150px] -right-[150px] size-80 rounded-full border-[1.5px] border-white/15" />
+            <span className="pointer-events-none absolute -top-[100px] -right-[100px] size-[220px] rounded-full border-[1.5px] border-white/15" />
+            <span className="pointer-events-none absolute -bottom-[170px] -left-[170px] size-[280px] rounded-full border-[1.5px] border-white/10" />
+
+            <div className="relative flex items-center justify-between">
+              <span className="rounded-full bg-white/15 px-3 py-[7px] text-xs whitespace-nowrap">
+                {DATE_FORMAT.format(now)}
+              </span>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setView("doors")}
+                  aria-label="Open the Doors page"
+                  className="flex size-[38px] items-center justify-center rounded-full border border-white/45 text-white transition-colors hover:bg-white/10"
+                >
+                  <ArrowUpRight className="size-4" strokeWidth={2} />
+                </button>
+              ) : (
+                <span className="rounded-full bg-white/15 px-3 py-[7px] text-xs whitespace-nowrap">{door.name}</span>
               )}
-            >
-              <LockOpen className="size-5" />
-              Unlock
-            </button>
-            {ADMIN_SECTIONS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setView(key)}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 font-mono text-[10px] tracking-[.12em] uppercase",
-                  view === key ? "text-primary" : "text-muted-foreground",
+            </div>
+
+            <div className="relative flex flex-col items-center gap-4 pt-1.5 pb-1 text-center">
+              <div className="relative flex size-[170px] items-center justify-center">
+                {(isOpen || opening) && (
+                  <>
+                    <span className="animate-ring-pulse absolute inset-5 rounded-full border-2 border-white/55" />
+                    <span className="animate-ring-pulse absolute inset-5 rounded-full border-2 border-white/55 [animation-delay:1.2s]" />
+                  </>
                 )}
-              >
-                <Icon className="size-5" />
-                {label}
-              </button>
-            ))}
+                <div className="relative flex size-[130px] items-center justify-center rounded-full bg-white shadow-[0_14px_30px_rgba(8,30,110,.3)]">
+                  {opening ? (
+                    <LoaderCircle className="size-[50px] animate-spin text-primary" strokeWidth={1.8} />
+                  ) : (
+                    <HeroIcon
+                      className={cn("size-[50px]", offline ? "text-slate-400" : isOpen ? "text-success" : "text-slate-900")}
+                      strokeWidth={1.8}
+                    />
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="text-[32px] leading-[1.1] font-semibold tracking-[-.02em]">{opening ? "Opening…" : stateText}</div>
+                <div className="mt-1.5 text-[13px] opacity-85">{subText}</div>
+              </div>
+            </div>
+
+            {door.schedule.enabled && !offline && (
+              <div className="relative mt-[18px]">
+                <div className="h-2 overflow-hidden rounded-full bg-white/20">
+                  <div className="h-full rounded-full bg-white" style={{ width: `${progress?.percent ?? 0}%` }} />
+                </div>
+                <div className="mt-2 flex justify-between text-[11px] opacity-85">
+                  <span>{door.schedule.from}</span>
+                  <span>{progress?.remaining ?? "Closed"}</span>
+                  <span>{door.schedule.until}</span>
+                </div>
+              </div>
+            )}
           </div>
-        </nav>
+
+          {/* The one button. Already open: a calm status pill instead. */}
+          <div className="flex flex-col gap-2">
+            {workingHours ? (
+              <div
+                role="status"
+                className="flex h-[58px] items-center justify-center gap-2.5 rounded-full bg-success/15 text-[15px] font-semibold text-success"
+              >
+                <Check className="size-[19px]" strokeWidth={2.5} />
+                Unlocked until {formatClock(door.schedule.until)}
+              </div>
+            ) : isOpen && !opening && !offline ? (
+              <div
+                role="status"
+                className="flex h-[58px] items-center justify-center gap-2.5 rounded-full bg-success/15 text-[15px] font-semibold text-success"
+              >
+                <Check className="size-[19px]" strokeWidth={2.5} />
+                {doorOpen ? "Door is open" : "Door unlocked"}
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={blocked || opening}
+                onClick={press}
+                className="flex h-[58px] items-center justify-center gap-2.5 rounded-full bg-foreground text-[15px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {opening ? (
+                  <LoaderCircle className="size-[19px] animate-spin" />
+                ) : door.pinRequired ? (
+                  <KeyRound className="size-[19px]" strokeWidth={1.8} />
+                ) : (
+                  <LockOpen className="size-[19px]" strokeWidth={1.8} />
+                )}
+                {opening ? "Opening…" : "Unlock door"}
+              </button>
+            )}
+            {failed && <p className="text-center text-xs text-destructive">{command?.message ?? "The door didn't respond."}</p>}
+            {requestError && <p className="text-center text-xs text-destructive">{requestError}</p>}
+            {loadError && <p className="text-center text-xs text-destructive">{loadError}</p>}
+          </div>
+
+          {/* Their own recent opens at this door */}
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-base font-semibold">Your recent opens</span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setView("log")}
+                  className="flex items-center gap-1 text-[13px] text-muted-foreground"
+                >
+                  <LayoutGrid className="size-3.5" />
+                  See all
+                </button>
+              )}
+            </div>
+            {recent.length === 0 ? (
+              <p className="rounded-[20px] border border-border bg-card px-4 py-5 text-center text-sm text-muted-foreground">
+                Nothing yet. Your opens at this door show up here.
+              </p>
+            ) : (
+              recent.map((event) => (
+                <div key={event.id} className="flex items-center gap-3 rounded-[20px] border border-border bg-card px-3.5 py-3">
+                  <span className="flex size-[42px] flex-none items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-accent-foreground">
+                    {initials(event.memberName ?? profile.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{event.memberName ?? profile.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">Opened via {METHOD_LABELS[event.method].toLowerCase()}</div>
+                  </div>
+                  <span className="flex-none rounded-full bg-secondary px-2.5 py-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
+                    {formatClockTime(event.occurredAt)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
       {pinOpen && door && (
@@ -368,6 +427,6 @@ function UnlockHome({
           }}
         />
       )}
-    </div>
+    </AppShell>
   );
 }

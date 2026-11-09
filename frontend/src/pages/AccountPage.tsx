@@ -7,16 +7,16 @@ import {
   LoaderCircle,
   Lock,
   LockOpen,
-  LogOut,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
-import { EventRow } from "@/components/EventRow";
+import { AppShell } from "@/components/AppShell";
+import { EventList, EventRow } from "@/components/EventRow";
 import { Keypad, PinDisplay, type KeypadKey } from "@/components/Keypad";
 import { Modal } from "@/components/Modal";
 import { SectionHeading } from "@/components/SectionLabel";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ROUND_BUTTON_CLASS } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
@@ -148,35 +148,18 @@ function AccountHome({
   };
 
   return (
-    <div className="min-h-dvh bg-background pb-10 text-foreground">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-primary text-primary-foreground">
-              <DoorClosed className="size-5" strokeWidth={2.25} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl leading-tight font-extrabold tracking-tight">
-                {profile ? `Hi, ${profile.name}` : "Smart Door"}
-              </h1>
-              <p className="truncate font-mono text-xs text-muted-foreground">
-                {profile ? `@${profile.username}` : "Your doors"}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-none items-center gap-2">
-            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-            <Button variant="outline" size="icon" onClick={() => setPasswordOpen(true)} aria-label="My password">
-              <UserRound />
-            </Button>
-            <Button variant="outline" size="icon" onClick={onLogout} aria-label="Sign out">
-              <LogOut />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-2xl space-y-8 px-4 py-6">
+    <AppShell
+      name={profile?.name ?? "there"}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      onLogout={onLogout}
+      actions={
+        <button type="button" onClick={() => setPasswordOpen(true)} aria-label="My password" className={ROUND_BUTTON_CLASS}>
+          <UserRound className="size-[18px]" strokeWidth={1.8} />
+        </button>
+      }
+    >
+      <div className="space-y-6">
         {loadError && <p className="rounded-[12px] bg-destructive/10 px-3 py-2 text-sm text-destructive">{loadError}</p>}
 
         <section className="space-y-3">
@@ -184,7 +167,7 @@ function AccountHome({
           {profile === null ? (
             <p className="text-sm text-muted-foreground">Loading your doors…</p>
           ) : profile.doors.length === 0 ? (
-            <div className="rounded-[18px] border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-input p-8 text-center text-sm text-muted-foreground">
               You can't open any door yet. Ask your admin to switch one on for you.
             </div>
           ) : (
@@ -204,8 +187,8 @@ function AccountHome({
 
         {profile && (
           <section className="space-y-3">
-            <SectionHeading label="Your account" title="What is set up" />
-            <div className="grid grid-cols-3 gap-2">
+            <h3 className="text-base font-semibold">Your account</h3>
+            <div className="grid grid-cols-3 gap-2.5">
               <Fact label="Doors" value={String(profile.doors.length)} />
               <Fact label="Phones" value={String(profile.phones)} />
               <Fact label="Fingers" value={String(profile.fingerprints)} />
@@ -217,19 +200,19 @@ function AccountHome({
           </section>
         )}
 
-        <section className="space-y-3">
-          <SectionHeading label="Your activity" title="Recent" />
+        <section className="space-y-2.5">
+          <h3 className="text-base font-semibold">Your recent activity</h3>
           {activity.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing yet — your opens and sign-ins show up here.</p>
           ) : (
-            <div className="space-y-2">
+            <EventList>
               {activity.slice(0, 12).map((event) => (
                 <EventRow key={event.id} event={event} />
               ))}
-            </div>
+            </EventList>
           )}
         </section>
-      </main>
+      </div>
 
       {pinFor && (
         <UnlockPinDialog
@@ -244,15 +227,15 @@ function AccountHome({
       )}
 
       {passwordOpen && <PasswordDialog onClose={() => setPasswordOpen(false)} onChanged={(next) => setProfile(next)} />}
-    </div>
+    </AppShell>
   );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[14px] border border-border bg-card p-3 text-center">
-      <p className="text-2xl font-extrabold tracking-tight tabular-nums">{value}</p>
-      <p className="font-mono text-[10px] tracking-[.12em] text-muted-foreground uppercase">{label}</p>
+    <div className="rounded-2xl border border-border bg-card p-3.5">
+      <p className="text-[28px] leading-none font-semibold tracking-[-.03em] tabular-nums">{value}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -284,27 +267,27 @@ function AccountDoorCard({ door, now, disabled, status, error, onPress }: Accoun
   const blocked = !door.online || (door.pinRequired && !door.pinSet);
 
   return (
-    <div className="space-y-3 rounded-[20px] border border-border bg-card p-4">
-      <div className="flex items-center gap-3">
+    <div className="overflow-hidden rounded-[18px] border border-border bg-card">
+      <div className="flex items-center gap-3 p-4">
         <div
           className={cn(
-            "flex size-11 flex-none items-center justify-center rounded-[12px]",
-            door.online ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+            "flex size-11 flex-none items-center justify-center rounded-xl",
+            door.online ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground",
           )}
         >
-          {door.doorOpen ? <DoorOpen className="size-5" /> : <DoorClosed className="size-5" />}
+          {door.doorOpen ? <DoorOpen className="size-[22px]" strokeWidth={1.8} /> : <DoorClosed className="size-[22px]" strokeWidth={1.8} />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-extrabold tracking-tight">{door.name}</p>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={cn("size-2 rounded-full", door.online ? "bg-success" : "bg-destructive")} />
+          <p className="truncate text-base font-semibold">{door.name}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className={cn("size-1.5 rounded-full", door.online ? "bg-success" : "bg-destructive")} />
             {stateText}
             <LockIcon className="size-3" />
           </p>
         </div>
       </div>
 
-      <div className="space-y-1.5 rounded-[14px] bg-secondary/60 p-3 text-xs text-muted-foreground">
+      <div className="space-y-2 border-t border-border bg-soft px-4 py-3 text-xs text-muted-foreground">
         <p className="flex items-start gap-2">
           <CalendarClock className="mt-0.5 size-3.5 flex-none" />
           <span>
@@ -322,29 +305,32 @@ function AccountDoorCard({ door, now, disabled, status, error, onPress }: Accoun
         </p>
       </div>
 
-      <Button
-        className="h-12 w-full rounded-[14px] text-sm font-extrabold uppercase"
-        disabled={disabled || blocked}
-        onClick={onPress}
-      >
-        {opening ? (
-          <LoaderCircle className="animate-spin" />
-        ) : succeeded ? (
-          <DoorOpen />
-        ) : door.pinRequired ? (
-          <KeyRound />
-        ) : (
-          <LockOpen />
-        )}
-        {opening ? "Opening…" : succeeded ? "Unlocked" : door.pinRequired ? "Enter PIN to unlock" : "Unlock"}
-      </Button>
+      <div className="space-y-2 p-4">
+        <button
+          type="button"
+          disabled={disabled || blocked}
+          onClick={onPress}
+          className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-full bg-foreground text-[15px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          {opening ? (
+            <LoaderCircle className="size-[19px] animate-spin" />
+          ) : succeeded ? (
+            <DoorOpen className="size-[19px]" strokeWidth={1.8} />
+          ) : door.pinRequired ? (
+            <KeyRound className="size-[19px]" strokeWidth={1.8} />
+          ) : (
+            <LockOpen className="size-[19px]" strokeWidth={1.8} />
+          )}
+          {opening ? "Opening…" : succeeded ? "Unlocked" : door.pinRequired ? "Enter PIN to unlock" : "Unlock door"}
+        </button>
 
-      {!door.online && <p className="text-xs text-muted-foreground">This door is offline right now.</p>}
-      {door.online && door.pinRequired && !door.pinSet && (
-        <p className="text-xs text-muted-foreground">This door has no PIN yet. Ask your admin to set one.</p>
-      )}
-      {failed && <p className="text-xs text-destructive">{status?.message ?? "The door didn't respond."}</p>}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+        {!door.online && <p className="text-xs text-muted-foreground">This door is offline right now.</p>}
+        {door.online && door.pinRequired && !door.pinSet && (
+          <p className="text-xs text-muted-foreground">This door has no PIN yet. Ask your admin to set one.</p>
+        )}
+        {failed && <p className="text-xs text-destructive">{status?.message ?? "The door didn't respond."}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
     </div>
   );
 }
@@ -470,7 +456,7 @@ function PasswordDialog({ onClose, onChanged }: { onClose: () => void; onChanged
 
   const field = (label: string, value: string, set: (value: string) => void, autoComplete: string, autoFocus = false) => (
     <label className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <Input
         type="password"
         required
@@ -494,7 +480,7 @@ function PasswordDialog({ onClose, onChanged }: { onClose: () => void; onChanged
         {mismatch && <p className="text-xs text-destructive">The two new passwords don't match.</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
         {saved && <p className="rounded-[12px] bg-success/15 px-3 py-2 text-sm text-success">Password changed.</p>}
-        <Button type="submit" className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase" disabled={!canSave}>
+        <Button type="submit" className="h-[50px] w-full rounded-full text-[15px] font-semibold" disabled={!canSave}>
           {saving && <LoaderCircle className="animate-spin" />}
           Change password
         </Button>

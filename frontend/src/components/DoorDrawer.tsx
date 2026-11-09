@@ -83,7 +83,7 @@ export function DoorDrawer({ open, doors, pickedId, onPick, onClose }: DoorDrawe
                   <DoorClosed className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-extrabold tracking-tight">{door.name}</span>
+                  <span className="block truncate text-sm font-semibold tracking-tight">{door.name}</span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className={cn("size-1.5 rounded-full", door.online ? "bg-success" : "bg-muted-foreground/50")} />
                     {doorLine(door)}

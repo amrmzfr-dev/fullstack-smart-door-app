@@ -4,7 +4,7 @@ import { Plus, Siren } from "lucide-react";
 import { DoorCard } from "@/components/DoorCard";
 import { DoorNameDialog } from "@/components/DoorNameDialog";
 import { DoorSetupDialog } from "@/components/DoorSetupDialog";
-import { EventRow } from "@/components/EventRow";
+import { EventList, EventRow } from "@/components/EventRow";
 import { SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
@@ -51,12 +51,12 @@ export function DoorsTab({ doors, loaded, events, eventsLoading, onViewLog, onDo
   const recent = events.filter((event) => event.type !== "door_opened" && event.type !== "door_closed").slice(0, RECENT_COUNT);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {showAlarm && latestAlarm && (
-        <div className="flex items-center gap-3 rounded-[16px] border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+        <div className="flex items-center gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-destructive">
           <Siren className="size-5 flex-none" />
           <div className="min-w-0">
-            <p className="text-sm font-bold">
+            <p className="text-sm font-semibold">
               {describeEvent(latestAlarm).title}
               {latestAlarm.doorName && ` · ${latestAlarm.doorName}`}
             </p>
@@ -67,7 +67,7 @@ export function DoorsTab({ doors, loaded, events, eventsLoading, onViewLog, onDo
 
       <section className="space-y-3">
         <SectionHeading label="Doors" title="Every door, live">
-          <Button onClick={() => setAdding(true)}>
+          <Button variant="ink" onClick={() => setAdding(true)}>
             <Plus />
             Add door
           </Button>
@@ -87,7 +87,7 @@ export function DoorsTab({ doors, loaded, events, eventsLoading, onViewLog, onDo
         {doors.length === 0 ? (
           <p className="text-sm text-muted-foreground">{loaded ? "No doors yet — add one." : "Loading doors…"}</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {doors.map((door) => (
               <DoorCard
                 key={door.id}
@@ -101,22 +101,23 @@ export function DoorsTab({ doors, loaded, events, eventsLoading, onViewLog, onDo
         )}
       </section>
 
-      <section className="space-y-3">
-        <SectionHeading label="Activity" title="Who came in">
-          <Button variant="outline" size="sm" onClick={onViewLog}>
-            Full log
-          </Button>
-        </SectionHeading>
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">Who came in</h3>
+          <button type="button" onClick={onViewLog} className="text-[13px] text-muted-foreground">
+            See all
+          </button>
+        </div>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {eventsLoading ? "Loading activity…" : "Nothing yet — PIN, fingerprint and exit-button use shows up here."}
           </p>
         ) : (
-          <div className="space-y-2">
+          <EventList>
             {recent.map((event) => (
               <EventRow key={event.id} event={event} />
             ))}
-          </div>
+          </EventList>
         )}
       </section>
 

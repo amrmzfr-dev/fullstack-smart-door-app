@@ -15,8 +15,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { EventRow } from "@/components/EventRow";
-import { SectionHeading, SectionLabel } from "@/components/SectionLabel";
+import { EventList, EventRow } from "@/components/EventRow";
+import { PanelHeading, SectionHeading } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { useStats } from "@/hooks/useStats";
@@ -28,6 +28,7 @@ import type { AccessEvent, Door, Stats } from "@/types";
 
 const ALARM_BANNER_MS = 10 * 60 * 1000;
 const RECENT_COUNT = 8;
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" });
 
 export type OverviewTarget = "doors" | "people" | "log";
 
@@ -38,39 +39,45 @@ interface OverviewTabProps {
   onGo: (target: OverviewTarget) => void;
 }
 
+type TileTone = "blue" | "plain" | "red";
+
+const TILE_ICON_CLASS: Record<TileTone, string> = {
+  blue: "bg-accent text-accent-foreground",
+  plain: "bg-secondary text-foreground",
+  red: "bg-destructive/15 text-destructive",
+};
+
 interface TileProps {
-  label: string;
+  title: string;
   value: string | number;
   detail: string;
   icon: LucideIcon;
-  tone?: "default" | "good" | "bad";
+  tone: TileTone;
 }
 
-function Tile({ label, value, detail, icon: Icon, tone = "default" }: TileProps) {
+// One "Today" number: icon, big value, plain-words caption.
+function Tile({ title, value, detail, icon: Icon, tone }: TileProps) {
   return (
-    <div className="flex flex-col gap-2 rounded-[18px] border border-border bg-card p-4">
+    <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-3.5">
       <div className="flex items-center justify-between">
-        <SectionLabel>{label}</SectionLabel>
-        <Icon className="size-4 text-muted-foreground" />
+        <span className={cn("flex size-[34px] items-center justify-center rounded-[10px]", TILE_ICON_CLASS[tone])}>
+          <Icon className="size-[18px]" strokeWidth={1.9} />
+        </span>
+        <span className="font-mono text-[10.5px] text-muted-foreground">Today</span>
       </div>
-      <span
-        className={cn(
-          "text-3xl leading-none font-extrabold tracking-tight tabular-nums",
-          tone === "good" && "text-success",
-          tone === "bad" && "text-destructive",
-        )}
-      >
-        {value}
-      </span>
-      <span className="truncate text-xs text-muted-foreground">{detail}</span>
+      <div>
+        <div className="text-[28px] leading-none font-semibold tracking-[-.03em] tabular-nums">{value}</div>
+        <div className="mt-1.5 text-[13px] font-semibold">{title}</div>
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</div>
+      </div>
     </div>
   );
 }
 
-function Panel({ label, title, children }: { label: string; title: string; children: ReactNode }) {
+function Panel({ label, title, children }: { label?: string; title: string; children: ReactNode }) {
   return (
-    <section className="space-y-3 rounded-[20px] border border-border bg-card p-4">
-      <SectionHeading label={label} title={title} />
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-4">
+      <PanelHeading label={label} title={title} />
       {children}
     </section>
   );
@@ -86,40 +93,52 @@ function DaysChart({ stats }: { stats: Stats }) {
   const peak = Math.max(1, ...stats.days.map((day) => day.granted + day.denied));
   return (
     <div>
-      <div className="flex h-36 items-end gap-1.5" role="img" aria-label="Opens and refusals per day, last 14 days">
-        {stats.days.map((day) => {
-          const total = day.granted + day.denied;
-          return (
-            <div
-              key={day.date}
-              title={`${day.date}: ${day.granted} opened, ${day.denied} turned away${day.alarms ? `, ${day.alarms} alarms` : ""}`}
-              className="flex h-full flex-1 flex-col justify-end"
-            >
-              <span className="mb-1 text-center font-mono text-[9px] text-muted-foreground tabular-nums">
-                {total > 0 ? total : ""}
-              </span>
-              <div className="flex flex-col justify-end overflow-hidden rounded-t-md" style={{ height: `${(total / peak) * 100}%` }}>
-                <div className="bg-destructive" style={{ flexGrow: day.denied }} />
-                <div className="bg-primary" style={{ flexGrow: day.granted }} />
+      <div className="relative h-[150px]">
+        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+          <div className="border-t border-dashed border-border" />
+          <div className="border-t border-dashed border-border" />
+          <div className="border-t border-dashed border-border" />
+          <div className="border-t border-border" />
+        </div>
+        <div
+          className="relative flex h-full items-end gap-[5px]"
+          role="img"
+          aria-label="Opens and refusals per day, last 14 days"
+        >
+          {stats.days.map((day) => {
+            const total = day.granted + day.denied;
+            return (
+              <div
+                key={day.date}
+                title={`${day.date}: ${day.granted} opened, ${day.denied} turned away${day.alarms ? `, ${day.alarms} alarms` : ""}`}
+                className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+              >
+                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{total > 0 ? total : ""}</span>
+                <div
+                  className="flex w-full flex-col justify-end overflow-hidden rounded-t-[5px] rounded-b-[2px]"
+                  style={{ height: total === 0 ? 3 : `${Math.max(3, (total / peak) * 82)}%` }}
+                >
+                  <div className="bg-foreground" style={{ flexGrow: day.denied }} />
+                  <div className={total === 0 ? "h-full bg-border" : "bg-primary"} style={{ flexGrow: day.granted }} />
+                </div>
               </div>
-              <div className={cn("h-0.5 rounded-full", total === 0 ? "bg-border" : "bg-transparent")} />
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-      <div className="mt-1 flex gap-1.5">
+      <div className="mt-1.5 flex gap-[5px]">
         {stats.days.map((day) => (
-          <span key={day.date} className="flex-1 text-center font-mono text-[9px] text-muted-foreground uppercase">
+          <span key={day.date} className="min-w-0 flex-1 text-center font-mono text-[9px] text-muted-foreground uppercase">
             {shortDay(day.date).slice(0, 2)}
           </span>
         ))}
       </div>
-      <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+      <div className="mt-3 flex gap-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-primary" /> Opened
+          <span className="size-2 rounded-[2px] bg-primary" /> Opened
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-destructive" /> Turned away
+          <span className="size-2 rounded-[2px] bg-foreground" /> Away
         </span>
       </div>
     </div>
@@ -158,18 +177,15 @@ function HoursChart({ stats }: { stats: Stats }) {
   );
 }
 
-function Bar({ label, value, peak, tone = "primary" }: { label: string; value: number; peak: number; tone?: "primary" | "muted" }) {
+function Bar({ label, value, peak }: { label: string; value: number; peak: number }) {
   return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="min-w-0 truncate font-semibold">{label}</span>
+    <div>
+      <div className="flex items-baseline justify-between gap-2 text-[13px]">
+        <span className="min-w-0 truncate font-medium">{label}</span>
         <span className="font-mono text-xs text-muted-foreground tabular-nums">{value}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-secondary">
-        <div
-          className={cn("h-full rounded-full", tone === "primary" ? "bg-primary" : "bg-muted-foreground/50")}
-          style={{ width: `${(value / peak) * 100}%` }}
-        />
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${(value / peak) * 100}%` }} />
       </div>
     </div>
   );
@@ -217,6 +233,46 @@ function healthItems(doors: Door[], stats: Stats | null): HealthItem[] {
   return items;
 }
 
+interface MeterProps {
+  label: string;
+  value: string;
+  detail: string;
+  percent: number;
+  bad?: boolean;
+}
+
+// "Doors online 1/3 · 2 offline" with a thin bar under it.
+function Meter({ label, value, detail, percent, bad }: MeterProps) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-[13px]">
+        <span className="font-medium">{label}</span>
+        <span>
+          <b className={cn("font-semibold", bad && "text-destructive")}>{value}</b>
+          <span className="text-muted-foreground"> · {detail}</span>
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div className={cn("h-full rounded-full", bad ? "bg-destructive" : "bg-primary")} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function percentOf(part: number, whole: number): number {
+  return whole === 0 ? 0 : Math.round((part / whole) * 100);
+}
+
+// Opens in the latest 7 days against the 7 before them, e.g. "+38% vs prior".
+function weekChange(stats: Stats): string | null {
+  const opens = stats.days.map((day) => day.granted);
+  const prior = opens.slice(0, 7).reduce((sum, count) => sum + count, 0);
+  const latest = opens.slice(7).reduce((sum, count) => sum + count, 0);
+  if (prior === 0) return null;
+  const change = Math.round(((latest - prior) / prior) * 100);
+  return `${change >= 0 ? "+" : ""}${change}% vs prior week`;
+}
+
 export function OverviewTab({ doors, events, eventsLoading, onGo }: OverviewTabProps) {
   const now = useNow(30000);
   const { stats, error } = useStats();
@@ -231,13 +287,16 @@ export function OverviewTab({ doors, events, eventsLoading, onGo }: OverviewTabP
   const doorPeak = Math.max(1, ...(stats?.perDoor.map((door) => door.granted + door.denied) ?? [1]));
   const peoplePeak = Math.max(1, ...(stats?.topPeople.map((person) => person.count) ?? [1]));
 
+  const opens14 = stats ? stats.days.reduce((sum, day) => sum + day.granted, 0) : null;
+  const change = stats ? weekChange(stats) : null;
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       {showAlarm && latestAlarm && (
-        <div className="flex items-center gap-3 rounded-[16px] border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+        <div className="flex items-center gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-destructive">
           <Siren className="size-5 flex-none" />
           <div className="min-w-0">
-            <p className="text-sm font-bold">
+            <p className="text-sm font-semibold">
               {describeEvent(latestAlarm).title}
               {latestAlarm.doorName && ` · ${latestAlarm.doorName}`}
             </p>
@@ -246,100 +305,138 @@ export function OverviewTab({ doors, events, eventsLoading, onGo }: OverviewTabP
         </div>
       )}
 
-      <SectionHeading label="Overview" title="Today at a glance" />
+      <SectionHeading label="Overview" title="Today at a glance">
+        <span className="pb-1 text-xs text-muted-foreground">{DATE_FORMAT.format(now)}</span>
+      </SectionHeading>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Opened today" value={stats?.grantedToday ?? "—"} detail="Doors opened" icon={DoorOpen} tone="good" />
-        <Tile
-          label="Turned away"
-          value={stats?.deniedToday ?? "—"}
-          detail="Wrong PIN or blocked"
-          icon={ShieldAlert}
-          tone={stats && stats.deniedToday > 0 ? "bad" : "default"}
-        />
-        <Tile
-          label="People today"
-          value={stats?.activePeopleToday ?? "—"}
-          detail={stats ? `${stats.signInsToday} signed in on the account page` : "Different people"}
-          icon={Users}
-        />
-        <Tile
-          label="Alarms today"
-          value={stats?.alarmsToday ?? "—"}
-          detail="Forced or left open"
-          icon={Siren}
-          tone={stats && stats.alarmsToday > 0 ? "bad" : "default"}
-        />
-        <Tile
-          label="Doors online"
-          value={stats ? `${stats.doorsOnline}/${stats.doors}` : "—"}
-          detail={stats ? `${stats.doorsWithOpenHours} with open hours` : "Controllers"}
-          icon={DoorClosed}
-          tone={stats && stats.doorsOnline < stats.doors ? "bad" : "default"}
-        />
-        <Tile
-          label="People"
-          value={stats ? `${stats.membersEnabled}/${stats.members}` : "—"}
-          detail="Enabled / total"
-          icon={Users}
-        />
-        <Tile
-          label="Sign-ins"
-          value={stats?.membersWithAccount ?? "—"}
-          detail={stats ? `${stats.membersWithPhone} with a phone · ${stats.membersWithFingerprint} with a finger` : "Accounts"}
-          icon={KeyRound}
-        />
-        <Tile
-          label="PIN required"
-          value={stats ? `${stats.doorsPinRequired}/${stats.doors}` : "—"}
-          detail="Doors asking for the PIN on accounts"
-          icon={ShieldCheck}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Panel label="Last 14 days" title="Opens per day">
-            {stats ? <DaysChart stats={stats} /> : <p className="text-sm text-muted-foreground">Loading…</p>}
-          </Panel>
+      {/* Big number: opens over the last 14 days */}
+      <div className="rounded-[20px] bg-nav p-[18px] text-white">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-xs text-white/60">Opens · last 14 days</div>
+            <div className="mt-1.5 flex items-baseline gap-2.5">
+              <span className="text-[40px] leading-none font-semibold tracking-[-.035em] tabular-nums">{opens14 ?? "—"}</span>
+              {change && (
+                <span className="rounded-full bg-white/10 px-2 py-[3px] text-xs font-semibold text-sky-200">{change}</span>
+              )}
+            </div>
+          </div>
+          <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-[5px] text-[11px] font-semibold">
+            <span className="size-1.5 rounded-full bg-sky-300" />
+            Live
+          </span>
         </div>
-        <Panel label="Setup check" title={problems === 0 ? "All good" : `${problems} to look at`}>
-          <ul className="space-y-2">
-            {health.map((item) => (
-              <li key={item.text} className="flex items-start gap-2 text-sm">
-                {item.ok ? (
-                  <CheckCircle2 className="mt-0.5 size-4 flex-none text-success" />
-                ) : (
-                  <AlertTriangle className="mt-0.5 size-4 flex-none text-warning" />
-                )}
-                <span className="min-w-0 flex-1">{item.text}</span>
-                {item.action && (
-                  <Button variant="ghost" size="xs" onClick={() => onGo(item.action!.target)}>
-                    {item.action.label}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Panel>
+        <div className="mt-[18px] grid grid-cols-3 border-t border-white/10 pt-3.5">
+          <div>
+            <div className="text-lg font-semibold tabular-nums">{stats?.deniedToday ?? "—"}</div>
+            <div className="mt-0.5 text-[11px] text-white/60">Turned away</div>
+          </div>
+          <div className="border-l border-white/10 pl-3.5">
+            <div className="text-lg font-semibold tabular-nums">{stats?.signInsToday ?? "—"}</div>
+            <div className="mt-0.5 text-[11px] text-white/60">Sign-ins</div>
+          </div>
+          <div className="border-l border-white/10 pl-3.5">
+            <div className={cn("text-lg font-semibold tabular-nums", stats && stats.alarmsToday > 0 && "text-red-300")}>
+              {stats?.alarmsToday ?? "—"}
+            </div>
+            <div className="mt-0.5 text-[11px] text-white/60">Alarms</div>
+          </div>
+        </div>
       </div>
 
-      {/* Every door: state, PIN rule and weekly schedule, side by side */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Tile
+          title="Doors opened"
+          value={stats?.grantedToday ?? "—"}
+          detail={stats && stats.grantedToday === 0 ? "No opens yet today" : "Opened today"}
+          icon={DoorOpen}
+          tone="blue"
+        />
+        <Tile title="Turned away" value={stats?.deniedToday ?? "—"} detail="Wrong PIN or blocked" icon={ShieldAlert} tone="plain" />
+        <Tile
+          title="People in"
+          value={stats?.activePeopleToday ?? "—"}
+          detail={stats ? `${stats.signInsToday} signed in on the app` : "Different people"}
+          icon={Users}
+          tone="plain"
+        />
+        <Tile title="Alarms" value={stats?.alarmsToday ?? "—"} detail="Forced or left open" icon={Siren} tone="red" />
+      </div>
+
+      <Panel label="Last 14 days" title="Opens per day">
+        {stats ? <DaysChart stats={stats} /> : <p className="text-sm text-muted-foreground">Loading…</p>}
+      </Panel>
+
+      <Panel title="System health">
+        {stats ? (
+          <div className="flex flex-col gap-3.5">
+            <Meter
+              label="Doors online"
+              value={`${stats.doorsOnline}/${stats.doors}`}
+              detail={stats.doorsOnline === stats.doors ? "all online" : `${stats.doors - stats.doorsOnline} offline`}
+              percent={percentOf(stats.doorsOnline, stats.doors)}
+              bad={stats.doorsOnline < stats.doors}
+            />
+            <Meter
+              label="People enabled"
+              value={`${stats.membersEnabled}/${stats.members}`}
+              detail={stats.membersEnabled === stats.members ? "all active" : "some switched off"}
+              percent={percentOf(stats.membersEnabled, stats.members)}
+            />
+            <Meter
+              label="PIN required"
+              value={`${stats.doorsPinRequired}/${stats.doors}`}
+              detail="doors"
+              percent={percentOf(stats.doorsPinRequired, stats.doors)}
+            />
+            <Meter
+              label="Open hours set"
+              value={`${stats.doorsWithOpenHours}/${stats.doors}`}
+              detail="doors"
+              percent={percentOf(stats.doorsWithOpenHours, stats.doors)}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        )}
+      </Panel>
+
+      <Panel label="Setup check" title={problems === 0 ? "All good" : `${problems} to look at`}>
+        <ul className="space-y-2.5">
+          {health.map((item) => (
+            <li key={item.text} className="flex items-start gap-2 text-[13px]">
+              {item.ok ? (
+                <CheckCircle2 className="mt-0.5 size-4 flex-none text-success" />
+              ) : (
+                <AlertTriangle className="mt-0.5 size-4 flex-none text-warning" />
+              )}
+              <span className="min-w-0 flex-1">{item.text}</span>
+              {item.action && (
+                <Button variant="outline" size="xs" onClick={() => onGo(item.action!.target)}>
+                  {item.action.label}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Panel>
+
+      {/* Every door: state, PIN rule and weekly schedule */}
       <Panel label="Doors" title="State, PIN rule and open hours">
         {doors.length === 0 ? (
           <p className="text-sm text-muted-foreground">No doors yet.</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-2.5">
             {doors.map((door) => {
               const insideHours = isInsideOpenHours(door.schedule, now);
               const stat = stats?.perDoor.find((entry) => entry.doorId === door.id);
               const LockIcon = door.locked === false ? LockOpen : Lock;
               return (
-                <div key={door.id} className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+                <div key={door.id} className="space-y-2 rounded-[14px] border border-border bg-soft p-3">
                   <div className="flex items-center gap-2">
-                    <span className={cn("size-2 flex-none rounded-full", door.online ? "bg-success" : "bg-destructive")} />
-                    <p className="min-w-0 flex-1 truncate text-sm font-extrabold tracking-tight">{door.name}</p>
+                    <span className={cn("size-[7px] flex-none rounded-full", door.online ? "bg-success" : "bg-destructive")} />
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold">{door.name}</p>
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <LockIcon className="size-3.5" />
                       {!door.online ? "Offline" : door.doorOpen ? "Open" : door.locked === false ? "Unlocked" : "Locked"}
@@ -379,75 +476,77 @@ export function OverviewTab({ doors, events, eventsLoading, onGo }: OverviewTabP
         )}
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={() => onGo("doors")}>
+            <DoorClosed />
             Manage doors
           </Button>
         </div>
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Panel label="Last 30 days" title="Most active people">
-          {!stats || stats.topPeople.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No named opens yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.topPeople.map((person) => (
-                <div key={person.memberId} className="space-y-1">
-                  <Bar label={person.name} value={person.count} peak={peoplePeak} />
-                  <p className="text-[11px] text-muted-foreground">Last in {formatAgo(person.lastAt, now)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-        <Panel label="Last 30 days" title="How people get in">
-          {!stats || stats.methods.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No opens yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.methods.map((method) => (
-                <Bar key={method.method} label={METHOD_LABELS[method.method]} value={method.count} peak={methodPeak} />
-              ))}
-            </div>
-          )}
-        </Panel>
-        <Panel label="Last 30 days" title="By door">
-          {!stats || stats.perDoor.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.perDoor.map((door) => (
-                <div key={door.doorId ?? door.name} className="space-y-1">
-                  <Bar label={door.name} value={door.granted + door.denied} peak={doorPeak} />
-                  <p className="text-[11px] text-muted-foreground">
-                    {door.granted} opened · {door.denied} turned away
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
+      <Panel label="Last 30 days" title="Most active people">
+        {!stats || stats.topPeople.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No named opens yet.</p>
+        ) : (
+          <div className="space-y-3.5">
+            {stats.topPeople.map((person) => (
+              <div key={person.memberId}>
+                <Bar label={person.name} value={person.count} peak={peoplePeak} />
+                <p className="mt-1 text-[11px] text-muted-foreground">Last in {formatAgo(person.lastAt, now)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel label="Last 30 days" title="How people get in">
+        {!stats || stats.methods.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No opens yet.</p>
+        ) : (
+          <div className="space-y-3.5">
+            {stats.methods.map((method) => (
+              <Bar key={method.method} label={METHOD_LABELS[method.method]} value={method.count} peak={methodPeak} />
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel label="Last 30 days" title="By door">
+        {!stats || stats.perDoor.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No activity yet.</p>
+        ) : (
+          <div className="space-y-3.5">
+            {stats.perDoor.map((door) => (
+              <div key={door.doorId ?? door.name}>
+                <Bar label={door.name} value={door.granted + door.denied} peak={doorPeak} />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {door.granted} opened · {door.denied} turned away
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       <Panel label="Hours" title="When doors get opened">
         {stats ? <HoursChart stats={stats} /> : <p className="text-sm text-muted-foreground">Loading…</p>}
       </Panel>
 
-      <section className="space-y-3">
-        <SectionHeading label="Activity" title="Who came in">
-          <Button variant="outline" size="sm" onClick={() => onGo("log")}>
-            Full log
-          </Button>
-        </SectionHeading>
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">Who came in</h3>
+          <button type="button" onClick={() => onGo("log")} className="text-[13px] text-muted-foreground">
+            See all
+          </button>
+        </div>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {eventsLoading ? "Loading activity…" : "Nothing yet — opens and sign-ins show up here."}
           </p>
         ) : (
-          <div className="space-y-2">
+          <EventList>
             {recent.map((event) => (
               <EventRow key={event.id} event={event} />
             ))}
-          </div>
+          </EventList>
         )}
       </section>
     </div>

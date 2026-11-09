@@ -45,7 +45,7 @@ export function Keypad({ onKey, disabled }: KeypadProps) {
                 : "border-border bg-card text-card-foreground shadow-[0_3px_0_var(--border)] hover:bg-muted",
             )}
           >
-            <span className={cn("leading-none font-extrabold", isClear || isEnter ? "text-2xl" : "text-[26px]")}>
+            <span className={cn("leading-none font-semibold", isClear || isEnter ? "text-2xl" : "text-[26px]")}>
               {key}
             </span>
             {hint && (

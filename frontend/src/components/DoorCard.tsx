@@ -1,12 +1,7 @@
 import { useState } from "react";
 import {
-  Cpu,
   DoorClosed,
-  DoorOpen,
-  FingerprintPattern,
   KeyRound,
-  Lock,
-  LockOpen,
   Pencil,
   PlugZap,
   ShieldCheck,
@@ -88,58 +83,59 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
       : `Last seen ${formatAgo(door.lastSeenAt ?? "", now)}`;
 
   return (
-    <div className="space-y-3 rounded-[20px] border border-border bg-card p-4">
-      <div className="flex items-center gap-3">
+    <div className="overflow-hidden rounded-[18px] border border-border bg-card">
+      <div className="flex items-center gap-3 p-4">
         <div
           className={cn(
-            "flex size-11 flex-none items-center justify-center rounded-[12px]",
-            online ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+            "flex size-11 flex-none items-center justify-center rounded-xl",
+            online ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground",
           )}
         >
-          <DoorClosed className="size-5" />
+          <DoorClosed className="size-[22px]" strokeWidth={1.8} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-extrabold tracking-tight">{door.name}</p>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <p className="truncate text-base font-semibold">{door.name}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               className={cn(
-                "size-2 rounded-full",
+                "size-1.5 rounded-full",
                 online ? "bg-success" : neverSeen ? "bg-muted-foreground/40" : "bg-destructive",
               )}
             />
             {online ? "Online" : neverSeen ? "Waiting for its controller" : "Offline"}
           </p>
         </div>
-        <Button variant="ghost" size="icon" aria-label={`Rename ${door.name}`} onClick={() => setDialog("rename")}>
-          <Pencil />
-        </Button>
+        <button
+          type="button"
+          aria-label={`Rename ${door.name}`}
+          onClick={() => setDialog("rename")}
+          className="flex size-[34px] flex-none items-center justify-center rounded-[9px] border border-border bg-card text-foreground transition-colors hover:bg-secondary"
+        >
+          <Pencil className="size-[15px]" strokeWidth={1.9} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border-y border-border bg-border">
         <StatusCard
           label="Door"
-          icon={door.doorOpen ? DoorOpen : DoorClosed}
           value={doorState.value}
           tone={doorState.tone}
           detail="Door contact"
         />
         <StatusCard
           label="Lock"
-          icon={door.locked === false ? LockOpen : Lock}
           value={lockState.value}
           tone={lockState.tone}
           detail="Magnetic lock"
         />
         <StatusCard
           label="Controller"
-          icon={Cpu}
           value={neverSeen ? "—" : online ? "Online" : "Offline"}
           tone={neverSeen ? "unknown" : online ? "good" : "bad"}
           detail={controllerDetail || "Reporting"}
         />
         <StatusCard
           label="Fingerprint"
-          icon={FingerprintPattern}
           value={sensorState.value}
           tone={sensorState.tone}
           detail={door.templateCount != null ? `${door.templateCount} stored on sensor` : "AS608 sensor"}
@@ -147,13 +143,13 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
       </div>
 
       {/* This door's PIN */}
-      <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
-        <KeyRound className="size-4 flex-none text-muted-foreground" />
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+        <KeyRound className="size-[18px] flex-none text-muted-foreground" strokeWidth={1.8} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Door PIN</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="text-sm font-semibold">Door PIN</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {door.pinSet
-              ? `• • • • — for everyone at this door${door.pinUpdatedAt ? ` · changed ${formatAgo(door.pinUpdatedAt, now)}` : ""}`
+              ? `•••• · shared with everyone here${door.pinUpdatedAt ? ` · changed ${formatAgo(door.pinUpdatedAt, now)}` : ""}`
               : "Not set — the PIN keypad won't open this door"}
           </p>
         </div>
@@ -168,14 +164,14 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
       </div>
 
       {/* Do signed-in people need the PIN, or just press Unlock? */}
-      <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
-        <ShieldCheck className="size-4 flex-none text-muted-foreground" />
+      <div className="flex items-start gap-3 border-b border-border px-4 py-3.5">
+        <ShieldCheck className="mt-px size-[18px] flex-none text-muted-foreground" strokeWidth={1.8} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">PIN required for account unlock</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm font-semibold">PIN required for app unlock</p>
+          <p className="mt-0.5 text-xs leading-[1.45] text-muted-foreground">
             {door.pinRequired
-              ? "On — people signed in on their phone must also type this door's PIN."
-              : "Off — people signed in on their phone just press Unlock. The door keypad still needs the PIN."}
+              ? "On — people must enter the PIN in the app to unlock."
+              : "Off — signed-in people just tap Unlock. The keypad still needs the PIN."}
           </p>
         </div>
         <Switch
@@ -200,7 +196,7 @@ export function DoorCard({ door, now, onChanged, onNotice }: DoorCardProps) {
 
       <DoorScheduleCard door={door} onChanged={onChanged} onNotice={onNotice} />
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-border p-3.5">
         <Button
           variant="outline"
           size="sm"

@@ -45,40 +45,36 @@ export function MemberCard({
   const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-4 rounded-[18px] border border-border bg-card p-4 transition-opacity",
-        !member.enabled && "opacity-70",
-      )}
-    >
-      <div className="flex items-center gap-3">
+    <div className={cn("border-b border-border transition-opacity last:border-b-0", !member.enabled && "opacity-70")}>
+      <div className="flex items-center gap-3 px-4 py-3.5">
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
           aria-label={`${open ? "Hide" : "Show"} details for ${member.name}`}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <div className="flex size-11 flex-none items-center justify-center rounded-[12px] bg-secondary font-mono text-sm font-semibold text-secondary-foreground">
+          <div className="flex size-10 flex-none items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
             {initials(member.name)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-base font-extrabold tracking-tight">
-              <span className="truncate">{member.name}</span>
-              {member.isAdmin && (
-                <span className="flex-none rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[9px] tracking-[.1em] text-primary uppercase">
-                  Admin
-                </span>
-              )}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-sm font-semibold">{member.name}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {!member.enabled
                 ? "Disabled — can't open any door"
                 : `${member.username ? `@${member.username} · ` : "No sign-in · "}${allowedDoors.length} of ${doors.length} ${doors.length === 1 ? "door" : "doors"}`}
             </p>
           </div>
+          <span
+            className={cn(
+              "flex-none rounded-md px-2 py-[3px] text-[11px] font-medium",
+              member.isAdmin ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground",
+            )}
+          >
+            {member.isAdmin ? "Admin" : "Member"}
+          </span>
           <ChevronDown
-            className={cn("size-5 flex-none text-muted-foreground transition-transform", open && "rotate-180")}
+            className={cn("size-[18px] flex-none text-muted-foreground transition-transform", open && "rotate-180")}
           />
         </button>
         <Switch
@@ -90,13 +86,13 @@ export function MemberCard({
       </div>
 
       {open && (
-        <>
+        <div className="space-y-3 px-4 pb-4">
       {/* Their sign-in for the /account page */}
-      <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+      <div className="space-y-2 rounded-[14px] border border-border bg-soft p-3">
         <div className="flex items-center gap-3">
           <UserRound className="size-4 flex-none text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Account</p>
+            <p className="text-sm font-semibold">Account</p>
             <p className="truncate text-xs text-muted-foreground">
               {member.username === null
                 ? "No sign-in — they can't use the account page"
@@ -123,7 +119,7 @@ export function MemberCard({
         {member.username !== null && (
           <div className="flex items-center gap-3 pl-7">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">Admin panel</p>
+              <p className="text-sm font-semibold">Admin panel</p>
               <p className="text-xs text-muted-foreground">
                 {member.isAdmin
                   ? "On — they see the admin bar under Unlock on their phone."
@@ -141,10 +137,10 @@ export function MemberCard({
       </div>
 
       {/* Which doors this person may open */}
-      <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+      <div className="space-y-2 rounded-[14px] border border-border bg-soft p-3">
         <div className="flex items-center gap-3">
           <DoorClosed className="size-4 flex-none text-muted-foreground" />
-          <p className="text-sm font-bold">Doors</p>
+          <p className="text-sm font-semibold">Doors</p>
         </div>
         <div className="space-y-1.5 pl-7">
           {doors.map((door) => {
@@ -167,11 +163,11 @@ export function MemberCard({
       </div>
 
       {/* Fingerprints — each one lives on one door's sensor */}
-      <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+      <div className="space-y-2 rounded-[14px] border border-border bg-soft p-3">
         <div className="flex items-center gap-3">
           <FingerprintPattern className="size-4 flex-none text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Fingerprints</p>
+            <p className="text-sm font-semibold">Fingerprints</p>
             <p className="text-xs text-muted-foreground">Scanned on each door's own sensor</p>
           </div>
         </div>
@@ -184,7 +180,7 @@ export function MemberCard({
               return (
                 <div key={door.id} className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate font-mono text-[10px] tracking-[.12em] text-muted-foreground uppercase">
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
                       {door.name}
                     </span>
                     <Button variant="outline" size="xs" disabled={busy} onClick={() => onAddFingerprint(door)}>
@@ -224,11 +220,11 @@ export function MemberCard({
       </div>
 
       {/* Phones (their own fingerprint / face unlock) — work on every door above */}
-      <div className="space-y-2 rounded-[14px] bg-secondary/60 p-3">
+      <div className="space-y-2 rounded-[14px] border border-border bg-soft p-3">
         <div className="flex items-center gap-3">
           <Smartphone className="size-4 flex-none text-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Phones</p>
+            <p className="text-sm font-semibold">Phones</p>
             <p className="text-xs text-muted-foreground">
               {member.phones.length === 0
                 ? "None set up"
@@ -273,7 +269,7 @@ export function MemberCard({
           Delete person
         </Button>
       </div>
-        </>
+        </div>
       )}
     </div>
   );

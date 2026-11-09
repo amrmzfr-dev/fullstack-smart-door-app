@@ -40,3 +40,10 @@ export function initials(name: string): string {
   }
   return name.slice(0, 2).toUpperCase();
 }
+
+const CLOCK_FORMAT = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+
+// "12:41 PM" — time without seconds.
+export function formatClockTime(value: string): string {
+  return CLOCK_FORMAT.format(new Date(value));
+}

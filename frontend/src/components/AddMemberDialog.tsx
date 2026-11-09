@@ -47,7 +47,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
     <Modal title="Add a person" subtitle="With a sign-in, they can open doors from their own phone" onClose={onClose}>
       <form onSubmit={(event) => void submit(event)} className="space-y-4">
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground">
             Name
           </span>
           <Input
@@ -64,9 +64,9 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
           />
         </label>
 
-        <div className="flex items-center gap-3 rounded-[14px] bg-secondary/60 p-3">
+        <div className="flex items-center gap-3 rounded-[14px] border border-border bg-soft p-3">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Create a sign-in now</p>
+            <p className="text-sm font-semibold">Create a sign-in now</p>
             <p className="text-xs text-muted-foreground">Username and password for the /account page</p>
           </div>
           <Switch checked={withAccount} onChange={setWithAccount} label="Create a sign-in now" />
@@ -75,7 +75,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
         {withAccount && (
           <div className="space-y-3">
             <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+              <span className="text-xs font-medium text-muted-foreground">
                 Username
               </span>
               <Input
@@ -94,7 +94,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+              <span className="text-xs font-medium text-muted-foreground">
                 Password
               </span>
               <div className="flex gap-2">
@@ -125,7 +125,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button
           type="submit"
-          className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase"
+          className="h-[50px] w-full rounded-full text-[15px] font-semibold"
           disabled={saving || name.trim().length === 0 || !accountReady}
         >
           {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}

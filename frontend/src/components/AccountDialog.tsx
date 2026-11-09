@@ -65,7 +65,7 @@ export function AccountDialog({ member, onClose, onSaved }: AccountDialogProps) 
     >
       <form onSubmit={(event) => void submit(event)} className="space-y-4">
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground">
             Username
           </span>
           <Input
@@ -83,7 +83,7 @@ export function AccountDialog({ member, onClose, onSaved }: AccountDialogProps) 
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] font-medium tracking-[.14em] text-muted-foreground uppercase">
+          <span className="text-xs font-medium text-muted-foreground">
             {exists ? "New password (leave empty to keep it)" : "Password"}
           </span>
           <div className="flex gap-2">
@@ -132,7 +132,7 @@ export function AccountDialog({ member, onClose, onSaved }: AccountDialogProps) 
           password on their own page.
         </p>
 
-        <Button type="submit" className="h-11 w-full rounded-[14px] text-sm font-extrabold uppercase" disabled={!canSave}>
+        <Button type="submit" className="h-[50px] w-full rounded-full text-[15px] font-semibold" disabled={!canSave}>
           {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
           {exists ? "Save account" : "Create account"}
         </Button>
