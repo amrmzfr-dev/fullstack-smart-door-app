@@ -16,7 +16,8 @@ public class StatsService(AppDbContext dbContext, IDoorStatusStore doorStatusSto
     {
         var offset = TimeSpan.FromMinutes(Math.Clamp(utcOffsetMinutes, -14 * 60, 14 * 60));
         var localToday = (DateTimeOffset.UtcNow + offset).Date;
-        var windowStart = new DateTimeOffset(localToday.AddDays(-(WindowDays - 1)), offset);
+        // The database only takes UTC times, so convert the local start of the window.
+        var windowStart = new DateTimeOffset(localToday.AddDays(-(WindowDays - 1)), offset).ToUniversalTime();
 
         var events = await dbContext.AccessEvents
             .AsNoTracking()

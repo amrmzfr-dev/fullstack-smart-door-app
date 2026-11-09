@@ -19,7 +19,8 @@ export class HttpError extends Error {
 function usesMemberToken(path: string): boolean {
   const current = window.location.pathname;
   if (current.startsWith("/account")) return true;
-  return current === "/" && path.startsWith("/member");
+  // "/member/..." is the person portal; "/members" is the admin list.
+  return current === "/" && (path === "/member" || path.startsWith("/member/"));
 }
 
 function activeToken(path: string): string | null {
