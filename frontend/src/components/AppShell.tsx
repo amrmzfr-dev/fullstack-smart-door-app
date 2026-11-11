@@ -100,7 +100,7 @@ export function AppShell<Key extends string>({
               nav ? "pb-32" : "pb-10",
             )}
           >
-            <div className="mx-auto w-full lg:max-w-4xl">{children}</div>
+            <div className="w-full">{children}</div>
           </main>
         </div>
 

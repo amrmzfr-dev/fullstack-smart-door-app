@@ -345,7 +345,7 @@ export function OverviewTab({ doors, events, eventsLoading, onGo }: OverviewTabP
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         <Tile
           title="Doors opened"
           value={stats?.grantedToday ?? "—"}

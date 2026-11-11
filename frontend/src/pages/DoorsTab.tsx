@@ -87,7 +87,7 @@ export function DoorsTab({ doors, loaded, events, eventsLoading, onViewLog, onDo
         {doors.length === 0 ? (
           <p className="text-sm text-muted-foreground">{loaded ? "No doors yet — add one." : "Loading doors…"}</p>
         ) : (
-          <div className="space-y-4">
+          <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {doors.map((door) => (
               <DoorCard
                 key={door.id}
