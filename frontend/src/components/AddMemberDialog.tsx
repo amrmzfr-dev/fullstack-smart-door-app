@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { Check, Copy, Dices, LoaderCircle, Plus, Share2 } from "lucide-react";
+import { Dices, LoaderCircle, Plus } from "lucide-react";
 
 import { randomPassword, suggestUsername } from "@/components/AccountDialog";
 import { Modal } from "@/components/Modal";
+import { ShareButtons } from "@/components/ShareButtons";
 import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/api";
 import { createMember, setMemberAdmin } from "@/lib/door";
+import { buildShareMessage } from "@/lib/share";
 import type { Member } from "@/types";
 
 const MIN_PASSWORD_LENGTH = 6;
@@ -17,21 +19,6 @@ interface CreatedAccount {
   username: string;
   password: string;
   adminFailed: boolean;
-}
-
-// The text an admin sends to the new person: where to sign in, plus the login.
-function buildShareMessage(name: string, username: string, password: string, isAdmin: boolean): string {
-  const lines = [
-    `Hi ${name}, here is your Smart Door sign-in.`,
-    "",
-    `Open: ${window.location.origin}`,
-    `Username: ${username}`,
-    `Password: ${password}`,
-  ];
-  if (isAdmin) {
-    lines.push("", "You also have admin access: you will see Overview, Doors, People and Log after you sign in.");
-  }
-  return lines.join("\n");
 }
 
 interface AddMemberDialogProps {
@@ -50,19 +37,8 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
 
   const [makeAdmin, setMakeAdmin] = useState(false);
   const [created, setCreated] = useState<CreatedAccount | null>(null);
-  const [copied, setCopied] = useState(false);
 
-  const copyMessage = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard blocked: the text is on screen to copy by hand.
-    }
-  };
-
-  const accountReady =!withAccount || (username.trim().length >= 3 && password.length >= MIN_PASSWORD_LENGTH);
+  const accountReady = !withAccount || (username.trim().length >= 3 && password.length >= MIN_PASSWORD_LENGTH);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -112,28 +88,7 @@ export function AddMemberDialog({ onClose, onCreated }: AddMemberDialogProps) {
           <p className="text-xs text-muted-foreground">
             This is the only time the password is shown in full. Copy it now.
           </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-[50px] flex-1 rounded-full text-[15px] font-semibold"
-              onClick={() => void copyMessage(message)}
-            >
-              {copied ? <Check /> : <Copy />}
-              {copied ? "Copied" : "Copy message"}
-            </Button>
-            {typeof navigator.share === "function" && (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-[50px] flex-1 rounded-full text-[15px] font-semibold"
-                onClick={() => void navigator.share({ text: message }).catch(() => undefined)}
-              >
-                <Share2 />
-                Share
-              </Button>
-            )}
-          </div>
+          <ShareButtons message={message} />
           <Button type="button" className="h-[50px] w-full rounded-full text-[15px] font-semibold" onClick={finish}>
             Done
           </Button>

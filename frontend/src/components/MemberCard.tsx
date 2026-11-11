@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ChevronDown, DoorClosed, FingerprintPattern, History, KeyRound, Plus, Smartphone, Trash2, UserRound, X } from "lucide-react";
 
+import { ShareButtons } from "@/components/ShareButtons";
 import { Switch } from "@/components/Switch";
 import { Button } from "@/components/ui/button";
 import { formatAgo, initials } from "@/lib/format";
+import { buildShareMessage } from "@/lib/share";
 import { cn } from "@/lib/utils";
 import type { Door, Fingerprint, Member, PhoneKey } from "@/types";
 
@@ -114,6 +116,15 @@ export function MemberCard({
             <Button variant="ghost" size="xs" disabled={busy} onClick={onRemoveAccount}>
               Remove sign-in
             </Button>
+          </div>
+        )}
+        {member.username !== null && (
+          <div className="flex flex-wrap items-center gap-2 pl-7">
+            <span className="text-xs text-muted-foreground">Send sign-in:</span>
+            <ShareButtons
+              size="small"
+              message={buildShareMessage(member.name, member.username, null, member.isAdmin)}
+            />
           </div>
         )}
         {member.username !== null && (
