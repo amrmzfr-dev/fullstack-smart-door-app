@@ -82,6 +82,19 @@ export function apiGet<T>(path: string): Promise<T> {
   return request<T>("GET", path);
 }
 
+// One GET with a token the caller already holds (used while signing in an
+// admin member on /admin, before any session is saved).
+export async function apiGetWithToken<T>(path: string, token: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new HttpError(readErrorMessage(text, response.statusText), response.status);
+  }
+  return (await response.json()) as T;
+}
+
 export function apiPost<T>(path: string, body: unknown = {}): Promise<T> {
   return request<T>("POST", path, body);
 }
