@@ -57,8 +57,8 @@ constexpr uint8_t PIN_KEYPAD_COL3 = 25;  // Keypad Col 3 — keys 3 6 9 # (input
 //   Belco D0 --10k--> base,  emitter --> GND (shared with the ESP32),
 //   collector --> ESP32 pin (the pin's pull-up gives it 3.3V).
 // The transistor flips the signal, so a pulse shows up as a RISING edge.
-constexpr uint8_t PIN_WIEGAND_D0 = 21;  // collector of the D0 transistor
-constexpr uint8_t PIN_WIEGAND_D1 = 22;  // collector of the D1 transistor
+constexpr uint8_t PIN_WIEGAND_D0 = 26;  // collector of the D0 transistor
+constexpr uint8_t PIN_WIEGAND_D1 = 27;  // collector of the D1 transistor
 constexpr bool WIEGAND_VIA_TRANSISTOR = true;  // false = lines wired straight in (3.3V keypads only)
 // 8-bit key frames are the key plus its inverse. The standard puts the key in
 // the first four bits (high nibble). If digits come out wrong, flip this.
@@ -72,6 +72,9 @@ constexpr bool RELAY_ACTIVE_LOW = true;
 
 // ---- Door exit button (dry contact, momentary, wired to GND) ---------------
 constexpr uint8_t PIN_EXIT_BUTTON = 19;  // Exit button input (pull-up), pressed = LOW
+// The Delco keypad checks its own PIN and closes its relay (NO + COM) when the PIN
+// is right. NO -> this pin, COM -> GND. Closed = LOW = "keypad said yes".
+constexpr uint8_t PIN_KEYPAD_RELAY = 26;
 
 // ---- Magnetic door contact (reed switch, dry contact, wired to GND) --------
 constexpr uint8_t PIN_DOOR_SENSOR = 23;  // Door contact input (pull-up)
@@ -240,6 +243,7 @@ void IRAM_ATTR onExitButtonChange() {
   }
 }
 DebouncedInput doorSensor = {PIN_DOOR_SENSOR, HIGH, HIGH, 0};
+DebouncedInput keypadRelay = {PIN_KEYPAD_RELAY, HIGH, HIGH, 0};
 
 // ---- Door ----
 bool doorOpen = false;
@@ -475,13 +479,17 @@ char wiegandKey(const WiegandFrame& frame) {
   return nibble == 11 ? '#' : NO_KEY;
 }
 
-// A key from the Belco if one arrived, otherwise from the old matrix keypad.
+// The old 4x3 matrix keypad scans GPIO 14/33/32/26/27/13/25. Leave it off while
+// the Belco is wired: its pins overlap the Wiegand D0/D1 pins and cause fake keys.
+constexpr bool USE_MATRIX_KEYPAD = false;
+
+// A key from the Belco if one arrived.
 char readKey() {
   WiegandFrame frame;
   if (wiegandTakeFrame(frame)) {
     return wiegandKey(frame);
   }
-  return keypad.getKey();
+  return USE_MATRIX_KEYPAD ? keypad.getKey() : NO_KEY;
 }
 
 void handleKeypad(uint32_t now) {
@@ -919,6 +927,18 @@ void handleExitButton(uint32_t now) {
   }
 }
 
+// The keypad's own relay closed: it accepted a PIN, so open the lock.
+void handleKeypadRelay(uint32_t now) {
+  if (!debounceUpdate(keypadRelay, now)) {
+    return;
+  }
+  if (keypadRelay.stableLevel == LOW) {  // closing edge only; release is ignored
+    Serial.println("[KEYPAD] keypad accepted a PIN");
+    triggerUnlock(UnlockSource::Keypad, now);
+    emitEvent(EventType::Granted, EventMethod::Keypad);
+  }
+}
+
 void handleDoorSensor(uint32_t now) {
   if (debounceUpdate(doorSensor, now)) {
     doorOpen = doorSensor.stableLevel != DOOR_CLOSED_LEVEL;
@@ -957,6 +977,7 @@ void printBootBanner() {
                 PIN_KEYPAD_COL1, PIN_KEYPAD_COL2, PIN_KEYPAD_COL3);
   Serial.printf(" Relay / EM lock (out)  : GPIO%u (active-%s)\n", PIN_RELAY, RELAY_ACTIVE_LOW ? "LOW" : "HIGH");
   Serial.printf(" Exit button (in, PU)   : GPIO%u\n", PIN_EXIT_BUTTON);
+  Serial.printf(" Keypad relay (in, PU)  : GPIO%u\n", PIN_KEYPAD_RELAY);
   Serial.printf(" Door contact (in, PU)  : GPIO%u\n", PIN_DOOR_SENSOR);
   Serial.printf(" DFPlayer TX/RX         : GPIO%u -> RX, GPIO%u <- TX\n", PIN_MP3_TX, PIN_MP3_RX);
   Serial.printf(" AS608 RX2/TX2          : GPIO%u <- TX, GPIO%u -> RX\n", PIN_FP_RX, PIN_FP_TX);
@@ -1008,8 +1029,10 @@ void setup() {
   debounceInit(exitButton, now);
   attachInterrupt(digitalPinToInterrupt(PIN_EXIT_BUTTON), onExitButtonChange, CHANGE);
   debounceInit(doorSensor, now);
+  debounceInit(keypadRelay, now);
   keypad.setDebounceTime(KEYPAD_DEBOUNCE_MS);
-  wiegandBegin(PIN_WIEGAND_D0, PIN_WIEGAND_D1, WIEGAND_VIA_TRANSISTOR);
+  // Wiegand is not started: this keypad judges the PIN itself and only closes a
+  // relay (see PIN_KEYPAD_RELAY), and its GPIO would clash with that input.
 
   printBootBanner();
 #if KEYPAD_DIAGNOSTIC
@@ -1042,6 +1065,7 @@ void loop() {
   handleKeypad(now);
 #endif
   handleExitButton(now);
+  handleKeypadRelay(now);
   handleDoorSensor(now);
   handleCommands(now);
   handleEnrollment(now);
