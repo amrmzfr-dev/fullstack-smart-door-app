@@ -56,7 +56,7 @@ export function LoginPage({
 
   return (
     <div className="flex min-h-dvh justify-center bg-page">
-      <div className="relative flex min-h-dvh w-full max-w-[440px] flex-col justify-center bg-background p-6 sm:shadow-[0_20px_60px_rgba(15,40,80,.12)]">
+      <div className="relative flex min-h-dvh w-full max-w-[440px] flex-col justify-center bg-background p-6 sm:shadow-[0_20px_60px_rgba(15,40,80,.12)] lg:my-auto lg:min-h-0 lg:max-w-[480px] lg:rounded-[32px] lg:p-10">
         <div className="absolute top-[max(18px,env(safe-area-inset-top))] right-[18px]">
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </div>
