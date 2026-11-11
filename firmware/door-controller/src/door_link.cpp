@@ -33,7 +33,7 @@ namespace {
 // CONFIG
 // ============================================================================
 
-constexpr char FIRMWARE_VERSION[] = "2.5.0";  // 2.2.0: OTA. 2.3.0: OTA crash safety (goes back to the old firmware if the new one is unhealthy)
+constexpr char FIRMWARE_VERSION[] = "2.6.1";  // 2.6.1: keypad relay input with a fast interrupt path (Delco keypad). 2.2.0: OTA. 2.3.0: OTA crash safety (goes back to the old firmware if the new one is unhealthy)
 
 // OTA update (see runOtaUpdate). The file is only ever fetched from this
 // backend, from under this path, with the device key.

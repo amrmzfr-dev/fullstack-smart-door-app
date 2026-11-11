@@ -245,6 +245,18 @@ void IRAM_ATTR onExitButtonChange() {
 DebouncedInput doorSensor = {PIN_DOOR_SENSOR, HIGH, HIGH, 0};
 DebouncedInput keypadRelay = {PIN_KEYPAD_RELAY, HIGH, HIGH, 0};
 
+// Fast path for the keypad's relay. The main loop can be busy for a moment with
+// network work, so waiting for it made the door open late. This interrupt drives
+// the lock relay the instant the keypad's contact closes; handleKeypadRelay()
+// then does the bookkeeping, and puts the lock back if it turns out to be noise.
+volatile bool keypadClosedSeen = false;
+uint32_t lastKeypadTriggerAt = 0;
+
+void IRAM_ATTR onKeypadRelayClosed() {
+  digitalWrite(PIN_RELAY, RELAY_ACTIVE_LOW ? LOW : HIGH);
+  keypadClosedSeen = true;
+}
+
 // ---- Door ----
 bool doorOpen = false;
 uint32_t doorOpenedAt = 0;
@@ -929,14 +941,28 @@ void handleExitButton(uint32_t now) {
 
 // The keypad's own relay closed: it accepted a PIN, so open the lock.
 void handleKeypadRelay(uint32_t now) {
-  if (!debounceUpdate(keypadRelay, now)) {
+  if (!keypadClosedSeen) {
     return;
   }
-  if (keypadRelay.stableLevel == LOW) {  // closing edge only; release is ignored
-    Serial.println("[KEYPAD] keypad accepted a PIN");
-    triggerUnlock(UnlockSource::Keypad, now);
-    emitEvent(EventType::Granted, EventMethod::Keypad);
+  keypadClosedSeen = false;
+
+  // The contact bounces for a moment when it closes; one real PIN is one event.
+  if (lastKeypadTriggerAt != 0 && now - lastKeypadTriggerAt < 1000) {
+    return;
   }
+  // Still closed? If not, it was a spike of noise, not the keypad: undo the
+  // early release (unless something else really has the lock open).
+  if (digitalRead(PIN_KEYPAD_RELAY) != LOW) {
+    if (!relayUnlocked) {
+      setRelayUnlocked(false);
+    }
+    return;
+  }
+
+  lastKeypadTriggerAt = now;
+  Serial.println("[KEYPAD] keypad accepted a PIN");
+  triggerUnlock(UnlockSource::Keypad, now);
+  emitEvent(EventType::Granted, EventMethod::Keypad);
 }
 
 void handleDoorSensor(uint32_t now) {
@@ -1030,6 +1056,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_EXIT_BUTTON), onExitButtonChange, CHANGE);
   debounceInit(doorSensor, now);
   debounceInit(keypadRelay, now);
+  attachInterrupt(digitalPinToInterrupt(PIN_KEYPAD_RELAY), onKeypadRelayClosed, FALLING);
   keypad.setDebounceTime(KEYPAD_DEBOUNCE_MS);
   // Wiegand is not started: this keypad judges the PIN itself and only closes a
   // relay (see PIN_KEYPAD_RELAY), and its GPIO would clash with that input.
