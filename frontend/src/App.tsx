@@ -3,6 +3,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/lib/theme";
 import { AccountPage } from "@/pages/AccountPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { InstallPage } from "@/pages/InstallPage";
 import { KeypadPage } from "@/pages/KeypadPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PhoneSetupPage } from "@/pages/PhoneSetupPage";
@@ -12,10 +13,12 @@ import { UnlockPage } from "@/pages/UnlockPage";
 // "/keypad"        the old public PIN keypad (no login)
 // "/admin"         management dashboard
 // "/account"       a person's own sign-in: see their doors and unlock them
+// "/install"      add the app to the phone home screen (shared when a person is created)
 // "/setup/<token>" one-time phone fingerprint setup, opened on the person's phone
 const PATH = window.location.pathname;
 const IS_ADMIN = PATH.startsWith("/admin");
 const IS_ACCOUNT = PATH.startsWith("/account");
+const IS_INSTALL = PATH.startsWith("/install");
 const IS_KEYPAD = PATH.startsWith("/keypad");
 const SETUP_TOKEN = PATH.startsWith("/setup/") ? decodeURIComponent(PATH.slice("/setup/".length)) : null;
 
@@ -24,6 +27,10 @@ export function App() {
 
   if (SETUP_TOKEN) {
     return <PhoneSetupPage token={SETUP_TOKEN} theme={theme} onToggleTheme={toggleTheme} />;
+  }
+
+  if (IS_INSTALL) {
+    return <InstallPage theme={theme} onToggleTheme={toggleTheme} />;
   }
 
   if (IS_ACCOUNT) {
