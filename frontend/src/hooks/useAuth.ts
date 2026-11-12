@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { HttpError, apiGetWithToken, apiPost } from "@/lib/api";
+import { clearMemberSession, setMemberSession } from "@/lib/memberAuth";
 import { AUTH_CHANGED_EVENT, clearSession, getToken, getUsername, setSession } from "@/lib/auth";
 import type { LoginResponse, MemberLoginResponse } from "@/types";
 
@@ -22,30 +23,33 @@ export function useAuth() {
     };
   }, []);
 
+  // One sign-in for everyone. The master login opens the admin pages. A person's
+  // login opens their doors, and also the admin pages when they are an admin.
   const login = useCallback(async (usernameInput: string, password: string) => {
     try {
       const response = await apiPost<LoginResponse>("/auth/login", { username: usernameInput, password });
+      clearMemberSession();
       setSession(response.token, response.username);
       return;
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 401) throw error;
     }
 
-    // Not the master login: try a member account that has admin access.
     const member = await apiPost<MemberLoginResponse>("/member/login", { username: usernameInput, password });
+    setMemberSession(member.token, member.name);
     try {
       const admin = await apiGetWithToken<{ token: string; username: string }>("/member/admin-token", member.token);
       setSession(admin.token, admin.username);
     } catch (error) {
-      if (error instanceof HttpError && error.status === 403) {
-        throw new HttpError("This account doesn't have admin access.", 401);
-      }
-      throw error;
+      // 403 = not an admin: they just see their own doors.
+      if (!(error instanceof HttpError) || error.status !== 403) throw error;
+      clearSession();
     }
   }, []);
 
   const logout = useCallback(() => {
     clearSession();
+    clearMemberSession();
   }, []);
 
   return { isAuthenticated: token !== null, username, login, logout };

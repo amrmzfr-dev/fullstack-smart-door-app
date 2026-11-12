@@ -20,7 +20,6 @@ import { ROUND_BUTTON_CLASS } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
-import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useNow } from "@/hooks/useNow";
 import { usePolling } from "@/hooks/usePolling";
 import { errorMessage } from "@/lib/api";
@@ -29,7 +28,6 @@ import { changeMyPassword, fetchMyActivity, fetchMyProfile, fetchMyUnlock, unloc
 import { describeSchedule, isInsideOpenHours } from "@/lib/schedule";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { LoginPage } from "@/pages/LoginPage";
 import type { AccessEvent, MemberDoor, MemberProfile } from "@/types";
 
 const PROFILE_POLL_MS = 3000;
@@ -38,32 +36,9 @@ const PIN_LENGTH = 4;
 const MIN_PASSWORD_LENGTH = 6;
 const RESULT_SHOWN_MS = 6000;
 
-interface AccountPageProps {
-  theme: Theme;
-  onToggleTheme: () => void;
-}
-
-// /account — a person signs in with the username and password the admin made
-// for them, sees their doors, and opens them. Doors that require a PIN ask for
-// it; doors that don't just open when the button is pressed.
-export function AccountPage({ theme, onToggleTheme }: AccountPageProps) {
-  const { isAuthenticated, login, logout } = useMemberAuth();
-
-  if (!isAuthenticated) {
-    return (
-      <LoginPage
-        onLogin={login}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
-        subtitle="Sign in to open your doors from your phone"
-      />
-    );
-  }
-
-  return <AccountHome onLogout={logout} theme={theme} onToggleTheme={onToggleTheme} />;
-}
-
-function AccountHome({
+// The signed-in page for people who are not admins: their doors, their own
+// activity, and a button for their password.
+export function AccountHome({
   onLogout,
   theme,
   onToggleTheme,
@@ -72,12 +47,39 @@ function AccountHome({
   theme: Theme;
   onToggleTheme: () => void;
 }) {
+  const account = useMyDoors();
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  return (
+    <AppShell
+      name={account.profile?.name ?? "there"}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      onLogout={onLogout}
+      actions={
+        <button type="button" onClick={() => setPasswordOpen(true)} aria-label="My password" className={ROUND_BUTTON_CLASS}>
+          <UserRound className="size-[18px]" strokeWidth={1.8} />
+        </button>
+      }
+    >
+      <MyDoorsContent account={account} />
+      {passwordOpen && <PasswordDialog onClose={() => setPasswordOpen(false)} onChanged={(next) => account.setProfile(next)} />}
+    </AppShell>
+  );
+}
+
+// The same doors-and-unlock content, for an admin's "My doors" tab.
+export function MyDoors() {
+  const account = useMyDoors();
+  return <MyDoorsContent account={account} />;
+}
+
+function useMyDoors() {
   const now = useNow(15000);
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [activity, setActivity] = useState<AccessEvent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pinFor, setPinFor] = useState<MemberDoor | null>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
 
   // Which door the last unlock was for, and how it went.
   const [activeDoorId, setActiveDoorId] = useState<string | null>(null);
@@ -147,18 +149,29 @@ function AccountHome({
     }
   };
 
+  return {
+    now,
+    profile,
+    setProfile,
+    activity,
+    loadError,
+    pinFor,
+    setPinFor,
+    activeDoorId,
+    requestError,
+    command,
+    busy,
+    startUnlock,
+    press,
+  };
+}
+
+function MyDoorsContent({ account }: { account: ReturnType<typeof useMyDoors> }) {
+  const { now, profile, activity, loadError, pinFor, setPinFor, activeDoorId, requestError, command, busy, startUnlock, press } =
+    account;
+
   return (
-    <AppShell
-      name={profile?.name ?? "there"}
-      theme={theme}
-      onToggleTheme={onToggleTheme}
-      onLogout={onLogout}
-      actions={
-        <button type="button" onClick={() => setPasswordOpen(true)} aria-label="My password" className={ROUND_BUTTON_CLASS}>
-          <UserRound className="size-[18px]" strokeWidth={1.8} />
-        </button>
-      }
-    >
+    <>
       <div className="space-y-6">
         {loadError && <p className="rounded-[12px] bg-destructive/10 px-3 py-2 text-sm text-destructive">{loadError}</p>}
 
@@ -225,9 +238,7 @@ function AccountHome({
           }}
         />
       )}
-
-      {passwordOpen && <PasswordDialog onClose={() => setPasswordOpen(false)} onChanged={(next) => setProfile(next)} />}
-    </AppShell>
+    </>
   );
 }
 
