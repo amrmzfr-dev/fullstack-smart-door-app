@@ -5,21 +5,12 @@ import { EventList, EventRow } from "@/components/EventRow";
 import { SectionHeading, SectionLabel } from "@/components/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { METHOD_LABELS, TYPE_LABELS, describeEvent, type EventCategory } from "@/lib/events";
+import { METHOD_LABELS, TYPE_LABELS, describeEvent } from "@/lib/events";
 import { dayKey, formatDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AccessEvent, AccessMethod, Door } from "@/types";
 
-type Filter = "all" | EventCategory;
 type Range = "today" | "7d" | "30d" | "all";
-
-const FILTERS: ReadonlyArray<{ key: Filter; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "access", label: "Access" },
-  { key: "account", label: "Sign-ins" },
-  { key: "alarm", label: "Alarms" },
-  { key: "door", label: "Door" },
-];
 
 const RANGES: ReadonlyArray<{ key: Range; label: string }> = [
   { key: "today", label: "Today" },
@@ -104,8 +95,9 @@ interface LogTabProps {
   loading: boolean;
 }
 
-export function LogTab({ events, doors, loading }: LogTabProps) {
-  const [filter, setFilter] = useState<Filter>("all");
+export function LogTab({ events: allEvents, doors, loading }: LogTabProps) {
+  // The log is only for unlocks: who opened which door, and how.
+  const events = useMemo(() => allEvents.filter((event) => event.type === "granted"), [allEvents]);
   const [doorFilter, setDoorFilter] = useState("all");
   const [personFilter, setPersonFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState<"all" | AccessMethod>("all");
@@ -123,7 +115,6 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
     const needle = query.trim().toLowerCase();
     return events.filter((event) => {
       if (new Date(event.occurredAt).getTime() < from) return false;
-      if (filter !== "all" && describeEvent(event).category !== filter) return false;
       if (doorFilter !== "all" && event.doorId !== doorFilter) return false;
       if (personFilter !== "all" && personOf(event) !== personFilter) return false;
       if (methodFilter !== "all" && event.method !== methodFilter) return false;
@@ -137,17 +128,13 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
       }
       return true;
     });
-  }, [events, filter, doorFilter, personFilter, methodFilter, range, query]);
+  }, [events, doorFilter, personFilter, methodFilter, range, query]);
 
   const groups = groupByDay(filtered);
-  const opened = filtered.filter((event) => event.type === "granted").length;
-  const refused = filtered.filter((event) => event.type === "denied" || event.type === "sign_in_failed").length;
-  const alarms = filtered.filter((event) => event.type === "forced_open" || event.type === "left_open").length;
   const filtersActive =
-    filter !== "all" || doorFilter !== "all" || personFilter !== "all" || methodFilter !== "all" || query !== "";
+    doorFilter !== "all" || personFilter !== "all" || methodFilter !== "all" || query !== "";
 
   const clearFilters = () => {
-    setFilter("all");
     setDoorFilter("all");
     setPersonFilter("all");
     setMethodFilter("all");
@@ -227,39 +214,10 @@ export function LogTab({ events, doors, loading }: LogTabProps) {
         )}
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto rounded-xl bg-secondary p-1">
-        {FILTERS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setFilter(key)}
-            className={cn(
-              "h-8 flex-1 rounded-[9px] px-2 text-[12.5px] font-semibold whitespace-nowrap transition-colors",
-              filter === key
-                ? "bg-card text-foreground shadow-[0_1px_2px_rgba(10,14,20,.08),0_0_0_1px_rgba(10,14,20,.04)]"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
         <span>
-          <b className="text-foreground">{filtered.length}</b> entries
+          <b className="text-foreground">{filtered.length}</b> unlocks
         </span>
-        <span>
-          <b className="text-primary dark:text-accent-foreground">{opened}</b> opened
-        </span>
-        <span>
-          <b className="text-foreground">{refused}</b> turned away
-        </span>
-        {alarms > 0 && (
-          <span>
-            <b className="text-destructive">{alarms}</b> alarms
-          </span>
-        )}
         {filtersActive && (
           <button type="button" onClick={clearFilters} className="underline underline-offset-2 hover:text-foreground">
             Clear filters
