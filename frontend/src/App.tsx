@@ -4,14 +4,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/lib/theme";
-import { AccountHome } from "@/pages/AccountPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { InstallPage } from "@/pages/InstallPage";
 import { KeypadPage } from "@/pages/KeypadPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PhoneSetupPage } from "@/pages/PhoneSetupPage";
+import { UnlockPage } from "@/pages/UnlockPage";
 
-// "/"              the app: admins see the dashboard + My doors, everyone else sees their doors
+// "/"              the Unlock page. Admins also get the admin pages in the bottom bar
 // "/sign-in"       the one sign-in page (signed-out visitors are sent here)
 // "/keypad"        the old public PIN keypad (no login)
 // "/install"       add the app to the phone home screen (shared when a person is created)
@@ -39,8 +39,7 @@ export function App() {
   return <SignedInApp theme={theme} onToggleTheme={toggleTheme} />;
 }
 
-// One sign-in page for everyone; what you see after it depends on who you are.
-// Admins get the admin pages (plus My doors); everyone else gets just their doors.
+// One sign-in page for everyone. After it, everyone gets the Unlock page; admins also get the admin pages in its bottom bar.
 function SignedInApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const admin = useAuth();
   const member = useMemberAuth();
@@ -64,17 +63,19 @@ function SignedInApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: ()
     );
   }
 
-  if (admin.isAuthenticated) {
-    return (
-      <DashboardPage
-        username={admin.username}
-        hasMyDoors={member.isAuthenticated}
-        onLogout={admin.logout}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
-      />
-    );
+  // A person (staff or admin): the Unlock page. Admins also get the admin pages in its bottom bar.
+  if (member.isAuthenticated) {
+    return <UnlockPage theme={theme} onToggleTheme={onToggleTheme} />;
   }
 
-  return <AccountHome onLogout={admin.logout} theme={theme} onToggleTheme={onToggleTheme} />;
+  // The master admin login has no person account, so no doors to open: just the admin pages.
+  return (
+    <DashboardPage
+      username={admin.username}
+      hasMyDoors={false}
+      onLogout={admin.logout}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+    />
+  );
 }

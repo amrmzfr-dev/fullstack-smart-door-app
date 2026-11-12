@@ -71,7 +71,10 @@ export function UnlockPage({ theme, onToggleTheme }: UnlockPageProps) {
     );
   }
 
-  return <UnlockHome onLogout={logout} theme={theme} onToggleTheme={onToggleTheme} />;
+  return <UnlockHome onLogout={() => {
+    clearSession();
+    logout();
+  }} theme={theme} onToggleTheme={onToggleTheme} />;
 }
 
 function UnlockHome({
