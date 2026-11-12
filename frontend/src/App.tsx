@@ -1,18 +1,15 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
-import { useAuth } from "@/hooks/useAuth";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useTheme } from "@/hooks/useTheme";
 import type { Theme } from "@/lib/theme";
-import { DashboardPage } from "@/pages/DashboardPage";
 import { InstallPage } from "@/pages/InstallPage";
 import { KeypadPage } from "@/pages/KeypadPage";
-import { LoginPage } from "@/pages/LoginPage";
 import { PhoneSetupPage } from "@/pages/PhoneSetupPage";
 import { UnlockPage } from "@/pages/UnlockPage";
 
-// "/"              the Unlock page. Admins also get the admin pages in the bottom bar
-// "/sign-in"       the one sign-in page (signed-out visitors are sent here)
+// "/"              the Unlock page. Admins also get Overview, Doors, People and Log in the bottom bar
+// "/sign-in"       the sign-in page (signed-out visitors are sent here)
 // "/keypad"        the old public PIN keypad (no login)
 // "/install"       add the app to the phone home screen (shared when a person is created)
 // "/setup/<token>" one-time phone fingerprint setup, opened on the person's phone
@@ -36,46 +33,21 @@ export function App() {
     return <KeypadPage theme={theme} onToggleTheme={toggleTheme} />;
   }
 
-  return <SignedInApp theme={theme} onToggleTheme={toggleTheme} />;
+  return <Home theme={theme} onToggleTheme={toggleTheme} />;
 }
 
-// One sign-in page for everyone. After it, everyone gets the Unlock page; admins also get the admin pages in its bottom bar.
-function SignedInApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
-  const admin = useAuth();
-  const member = useMemberAuth();
-  const signedIn = admin.isAuthenticated || member.isAuthenticated;
+// Sign in once. Signed out you are on /sign-in, signed in you are on "/".
+// The Unlock page shows the sign-in form itself when nobody is signed in, and
+// adds the admin pages when the person is an admin.
+function Home({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
+  const { isAuthenticated } = useMemberAuth();
 
-  // Like any other app: signed out -> /sign-in, signed in -> back to "/".
-  useEffect(() => {
+  // Layout effect: the address must be right before the page starts loading its data.
+  useLayoutEffect(() => {
     const onSignIn = window.location.pathname.startsWith("/sign-in");
-    if (!signedIn && !onSignIn) window.history.replaceState(null, "", "/sign-in");
-    if (signedIn && window.location.pathname !== "/") window.history.replaceState(null, "", "/");
-  }, [signedIn]);
+    if (!isAuthenticated && !onSignIn) window.history.replaceState(null, "", "/sign-in");
+    if (isAuthenticated && window.location.pathname !== "/") window.history.replaceState(null, "", "/");
+  }, [isAuthenticated]);
 
-  if (!signedIn) {
-    return (
-      <LoginPage
-        onLogin={admin.login}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
-        subtitle="Sign in to open your doors and manage the app"
-      />
-    );
-  }
-
-  // A person (staff or admin): the Unlock page. Admins also get the admin pages in its bottom bar.
-  if (member.isAuthenticated) {
-    return <UnlockPage theme={theme} onToggleTheme={onToggleTheme} />;
-  }
-
-  // The master admin login has no person account, so no doors to open: just the admin pages.
-  return (
-    <DashboardPage
-      username={admin.username}
-      hasMyDoors={false}
-      onLogout={admin.logout}
-      theme={theme}
-      onToggleTheme={onToggleTheme}
-    />
-  );
+  return <UnlockPage theme={theme} onToggleTheme={onToggleTheme} />;
 }

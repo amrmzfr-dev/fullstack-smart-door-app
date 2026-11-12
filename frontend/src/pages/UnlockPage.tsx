@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, KeyRound, LayoutGrid, LoaderCircle, Lock, LockOpen
 
 import { ADMIN_SECTIONS, AdminSections, type AdminSection } from "@/components/AdminSections";
 import { AppShell, type NavItem } from "@/components/AppShell";
+import { UnlockPinDialog } from "@/components/UnlockPinDialog";
 import { isFinished, useCommandTracker } from "@/hooks/useCommandTracker";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useNow } from "@/hooks/useNow";
@@ -15,7 +16,6 @@ import { fetchMyActivity, fetchMyAdminToken, fetchMyProfile, fetchMyUnlock, unlo
 import { describeSchedule, formatClock, isInsideOpenHours, openHoursProgress } from "@/lib/schedule";
 import type { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { UnlockPinDialog } from "@/pages/AccountPage";
 import { LoginPage } from "@/pages/LoginPage";
 import type { AccessEvent, MemberDoor, MemberProfile } from "@/types";
 
