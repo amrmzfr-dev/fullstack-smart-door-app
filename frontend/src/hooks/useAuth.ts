@@ -23,19 +23,24 @@ export function useAuth() {
     };
   }, []);
 
-  // One sign-in for everyone. The master login opens the admin pages. A person's
-  // login opens their doors, and also the admin pages when they are an admin.
+  // One sign-in for everyone. A person's login comes first: it opens the Unlock page, and the
+  // admin pages too when they are an admin. Only if it is not a person's login do we try the
+  // master admin login (admin pages only, no doors to open).
   const login = useCallback(async (usernameInput: string, password: string) => {
+    let member: MemberLoginResponse | null = null;
     try {
-      const response = await apiPost<LoginResponse>("/auth/login", { username: usernameInput, password });
-      clearMemberSession();
-      setSession(response.token, response.username);
-      return;
+      member = await apiPost<MemberLoginResponse>("/member/login", { username: usernameInput, password });
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 401) throw error;
     }
 
-    const member = await apiPost<MemberLoginResponse>("/member/login", { username: usernameInput, password });
+    if (member === null) {
+      const response = await apiPost<LoginResponse>("/auth/login", { username: usernameInput, password });
+      clearMemberSession();
+      setSession(response.token, response.username);
+      return;
+    }
+
     setMemberSession(member.token, member.name);
     try {
       const admin = await apiGetWithToken<{ token: string; username: string }>("/member/admin-token", member.token);
