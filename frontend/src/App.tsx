@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useMemberAuth } from "@/hooks/useMemberAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -9,7 +11,8 @@ import { KeypadPage } from "@/pages/KeypadPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PhoneSetupPage } from "@/pages/PhoneSetupPage";
 
-// "/"              the one sign-in page. Admins then see the dashboard + My doors, everyone else sees their doors
+// "/"              the app: admins see the dashboard + My doors, everyone else sees their doors
+// "/sign-in"       the one sign-in page (signed-out visitors are sent here)
 // "/keypad"        the old public PIN keypad (no login)
 // "/install"       add the app to the phone home screen (shared when a person is created)
 // "/setup/<token>" one-time phone fingerprint setup, opened on the person's phone
@@ -41,8 +44,16 @@ export function App() {
 function SignedInApp({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const admin = useAuth();
   const member = useMemberAuth();
+  const signedIn = admin.isAuthenticated || member.isAuthenticated;
 
-  if (!admin.isAuthenticated && !member.isAuthenticated) {
+  // Like any other app: signed out -> /sign-in, signed in -> back to "/".
+  useEffect(() => {
+    const onSignIn = window.location.pathname.startsWith("/sign-in");
+    if (!signedIn && !onSignIn) window.history.replaceState(null, "", "/sign-in");
+    if (signedIn && window.location.pathname !== "/") window.history.replaceState(null, "", "/");
+  }, [signedIn]);
+
+  if (!signedIn) {
     return (
       <LoginPage
         onLogin={admin.login}

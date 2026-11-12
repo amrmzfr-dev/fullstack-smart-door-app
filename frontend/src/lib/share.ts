@@ -5,7 +5,7 @@ export function buildShareMessage(name: string, username: string, password: stri
   const lines = [
     `Hi ${name}, here is your Smart Door sign-in.`,
     "",
-    `Open: ${window.location.origin}`,
+    `Open: ${window.location.origin}/sign-in`,
     `Username: ${username}`,
     `Password: ${password ?? "ask your admin"}`,
     "",

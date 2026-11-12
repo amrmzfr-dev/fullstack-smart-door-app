@@ -2,7 +2,7 @@
   "name": "Smart Door",
   "short_name": "Smart Door",
   "description": "Open the office doors from your phone.",
-  "start_url": "/",
+  "start_url": "/sign-in",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

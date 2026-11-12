@@ -18,7 +18,6 @@ export class HttpError extends Error {
 // calls and an admin sign-in for everything else (the admin panel bar).
 function usesMemberToken(path: string): boolean {
   const current = window.location.pathname;
-  if (current.startsWith("/account")) return true;
   // "/member/..." is the person portal; "/members" is the admin list.
   return current === "/" && (path === "/member" || path.startsWith("/member/"));
 }
