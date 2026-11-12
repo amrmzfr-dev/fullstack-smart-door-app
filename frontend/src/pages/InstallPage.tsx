@@ -49,7 +49,7 @@ export function InstallPage({ theme, onToggleTheme }: InstallPageProps) {
             </div>
             <p className="text-sm">The app is already on this phone.</p>
             <a
-              href="/account"
+              href="/"
               className="inline-block rounded-[16px] bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
             >
               Open Smart Door
@@ -105,7 +105,7 @@ export function InstallPage({ theme, onToggleTheme }: InstallPageProps) {
         )}
 
         {platform !== "installed" && (
-          <a href="/account" className="text-xs text-muted-foreground underline underline-offset-4">
+          <a href="/" className="text-xs text-muted-foreground underline underline-offset-4">
             Skip and just open the page
           </a>
         )}
